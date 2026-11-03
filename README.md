@@ -1,11 +1,11 @@
-# Lineup Lab
-
-Pick any NFL team, set the lineup on both sides of the ball, and simulate games against real NFL rosters to find the players costing you points. The Bengals are the default.
-
-## Run it
+# Run it
 
 https://nfl-teams-sim.vercel.app/
 
+
+# Lineup Lab
+
+Pick any NFL team, set the lineup on both sides of the ball, and simulate games against real NFL rosters to find the players costing you points. The Bengals are the default.
 
 
 - **Team picker:** all 32 teams. The page recolors to the team's colors, and each team keeps its own lineups, rating edits and custom players.
