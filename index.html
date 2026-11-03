@@ -249,6 +249,18 @@ details.pool[open] summary h2::after{content:" –"}
       <label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-weight:600;font-size:14px"><input type="checkbox" id="use-live" checked> Adjust ratings with this season's stats</label>
       <div id="notices" style="display:flex;flex-direction:column;gap:6px;margin-top:10px"></div>
     </section>
+    
+    <section class="panel" aria-labelledby="h-sum">
+      <h2 id="h-sum">Results<span class="pill warn stale" id="stale" hidden>Lineup changed, rerun</span></h2>
+      <p class="sub" id="sum-sub">Simulating…</p>
+      <div class="tiles" id="tiles"></div>
+      <div class="scroll" style="margin-top:14px">
+        <table>
+          <thead><tr><th>Opponent</th><th class="n">Win %</th><th class="n">Avg score</th><th class="n" title="Your offense, yards per play">Off Y/P</th><th class="n" title="Your defense, yards per play allowed">Def Y/P</th><th class="n" title="Pass yards per attempt allowed">Pass Y/A</th><th class="n" title="Rush yards per carry allowed">Rush Y/C</th></tr></thead>
+          <tbody id="opp-body"></tbody>
+        </table>
+      </div>
+    </section>
 
     <section class="panel" aria-labelledby="h-po" id="po-panel" hidden>
       <h2 id="h-po">Playoff odds</h2>
@@ -268,17 +280,7 @@ details.pool[open] summary h2::after{content:" –"}
       <p class="note" id="po-note"></p>
     </section>
 
-    <section class="panel" aria-labelledby="h-sum">
-      <h2 id="h-sum">Results<span class="pill warn stale" id="stale" hidden>Lineup changed, rerun</span></h2>
-      <p class="sub" id="sum-sub">Simulating…</p>
-      <div class="tiles" id="tiles"></div>
-      <div class="scroll" style="margin-top:14px">
-        <table>
-          <thead><tr><th>Opponent</th><th class="n">Win %</th><th class="n">Avg score</th><th class="n" title="Your offense, yards per play">Off Y/P</th><th class="n" title="Your defense, yards per play allowed">Def Y/P</th><th class="n" title="Pass yards per attempt allowed">Pass Y/A</th><th class="n" title="Rush yards per carry allowed">Rush Y/C</th></tr></thead>
-          <tbody id="opp-body"></tbody>
-        </table>
-      </div>
-    </section>
+
 
     <section class="panel" aria-labelledby="h-swap">
       <h2 id="h-swap">Best swaps</h2>
