@@ -2,6 +2,12 @@
 
 Pick any NFL team, set the lineup on both sides of the ball, and simulate games against real NFL rosters to find the players costing you points. The Bengals are the default.
 
+## Run it
+
+https://nfl-teams-sim.vercel.app/
+
+
+
 - **Team picker:** all 32 teams. The page recolors to the team's colors, and each team keeps its own lineups, rating edits and custom players.
 - **Defense:** 11 spots in a nickel 4-2-5, preset from ESPN's depth chart. 3-4 teams are mapped too: outside linebackers rush from the edge, and the ends play inside.
 - **Offense:** QB, RB, three receivers, a tight end and five linemen, preset from the depth chart. Switch between the two with the Defense / Offense tabs.
@@ -40,10 +46,6 @@ They update in two ways:
 
 1. **Weekly snapshot.** The `Refresh stats` GitHub Action runs every Tuesday after Monday Night Football and commits `data/league.json` plus `data/teams/<TEAM>.json`. You can also run it any time from **Actions → Refresh stats → Run workflow**.
 2. **Live in the browser.** When the page loads from GitHub Pages, it shows the snapshot first, then fetches fresh stats in the background. The **Refresh live** button does the same on demand.
-
-## Run it
-
-https://nfl-teams-sim.vercel.app/
 
 
 ## Files
