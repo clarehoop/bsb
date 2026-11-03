@@ -1,4 +1,4 @@
-# Run it
+# Run it!
 
 https://nfl-teams-sim.vercel.app/
 
