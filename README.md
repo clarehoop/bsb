@@ -1,30 +1,36 @@
-# Defense Lab
+# Lineup Lab
 
-Pick any NFL team, keep its offense locked, swap defensive players in and out, and simulate games against other offenses to find the spots costing you points. The Bengals are the default.
+Pick any NFL team, set the lineup on both sides of the ball, and simulate games against real NFL rosters to find the players costing you points. The Bengals are the default.
 
-- **Team picker:** all 32 teams. The page recolors to the team's colors, and each team keeps its own lineup, rating edits and custom players.
-- **Lineup:** 11 spots in a nickel 4-2-5, preset from ESPN's depth chart. 3-4 teams are mapped too: outside linebackers rush from the edge, and the ends play inside. Injured and cut players are swapped out automatically.
+- **Team picker:** all 32 teams. The page recolors to the team's colors, and each team keeps its own lineups, rating edits and custom players.
+- **Defense:** 11 spots in a nickel 4-2-5, preset from ESPN's depth chart. 3-4 teams are mapped too: outside linebackers rush from the edge, and the ends play inside.
+- **Offense:** QB, RB, three receivers, a tight end and five linemen, preset from the depth chart. Switch between the two with the Defense / Offense tabs.
+- **Every game is simulated play by play on both sides.** Your offense faces each opponent's real defensive starters, rated the same way as yours. Your defense faces their offense.
 - **Opponents:** the other 31 teams. Teams left on the schedule come first. Quick picks: next game, rest of schedule, division, all teams.
-- **Best swaps:** every bench, practice squad, free-agent type and custom player is tested in every spot they can play, ranked by points saved per game.
-- **Player report:** each starter's value against a league-average player at that spot, plus their season stats.
+- **Best swaps:** every bench, practice squad, free-agent type and custom player is tested in every spot they can play. Ranked by points saved on defense, or points gained on offense.
+- **Player report:** each starter's value against a league-average player at that spot, their season stats, and their simulated stats.
+- **Injuries:** injured and cut players are swapped out automatically.
 
 ## Ratings
 
-Every defender has four ratings on a 40–99 scale: pass rush, run defense, coverage and tackling.
+Defenders have four ratings on a 40–99 scale (pass rush, run defense, coverage, tackling). Offensive players have one.
 
-- **Bengals:** hand-set ratings (`DEFAULT_POOL` in `index.html`). With "Adjust ratings with this season's stats" on, season stats nudge them by up to 6 points.
-- **Every other team:** calculated from public stats by `js/ratings.js`:
-  1. Each player is ranked per game against the league's regulars at the same role (DE, DT, LB, CB, S). The stats are sacks and forced fumbles for pass rush; non-sack tackles for loss plus tackle volume for run defense; passes defended and interceptions for coverage; and tackles per game for tackling.
-  2. The percentile maps to a rating range whose middle is an average starter.
-  3. Small samples and low snap counts are pulled toward a backup-level rating.
-  4. A calibration lift is added, plus a team factor based on the defense's real points allowed.
+- **Bengals:** hand-set ratings (`DEFAULT_POOL` and `OFF_POOL` in `index.html`). With "Adjust ratings with this season's stats" on, season stats nudge the defenders by up to 6 points.
+- **Every other team:** calculated from public stats by `js/ratings.js`.
+  - Each player is ranked per game against the league's regulars at the same role.
+  - The percentile maps to a rating range whose middle is an average starter.
+  - Small samples and low playing time are pulled toward a backup-level rating.
+  - Defense stats: sacks and forced fumbles for pass rush; non-sack tackles for loss plus tackle volume for run defense; passes defended and interceptions for coverage; tackles per game for tackling.
+  - Offense stats: QBs use adjusted net yards per attempt plus rushing. RBs use yards per carry and scrimmage yards. WRs and TEs use yards per target and receiving yards per game.
+  - Offensive linemen have no individual stats, so they're rated from their team's sack rate and yards per carry. Backups sit 7 points lower.
+  - A calibration lift is added, plus a team factor based on real points allowed (defense) or scored (offense).
 - **Custom:** you can edit any rating or add players on any team. Edits are saved in your browser, per team.
 
-**Calibration (2026, week 8):**
-- Points allowed: across all 32 teams' default lineups, simulated points allowed average 23.0 against a real 23.1. They track real results with a correlation of 0.86 and are off by 2.3 points per game on average.
-- Points scored: simulated points scored match real points scored with a correlation of 0.99.
+**Calibration (2026, week 8):** every team's default lineups were simulated against every other team's.
+- Points scored: simulated 23.1 per game against a real 23.1. Correlation 0.88, off by 2.2 points on average.
+- Points allowed: simulated 22.9 per game against a real 23.0. Correlation 0.88, off by 2.3 points on average.
 
-The knobs are `STAT_LIFT` and `TEAM_DEF_K` in `index.html`.
+The knobs are `STAT_LIFT`, `TEAM_DEF_K`, `OFF_LIFT` and `TEAM_OFF_K` in `index.html`.
 
 ## Stats
 
@@ -37,24 +43,13 @@ They update in two ways:
 
 ## Run it
 
-Open the site on GitHub Pages: **Settings → Pages → Deploy from a branch → `main` / root**.
+https://nfl-teams-sim.vercel.app/
 
-To run it locally, the page needs a web server (ES modules don't load from `file://`):
-
-```bash
-python3 -m http.server 8000
-```
-
-To update the snapshot by hand (Node 18+, about 10 seconds):
-
-```bash
-node scripts/fetch-stats.mjs
-```
 
 ## Files
 
 - `index.html` is the app: UI and simulation engine.
 - `js/espn.js` fetches from ESPN. It is shared by the browser and the script.
-- `js/ratings.js` turns stats into ratings.
+- `js/ratings.js` turns stats into ratings (defense and offense).
 - `scripts/fetch-stats.mjs` writes the `data/` snapshot.
 - `.github/workflows/refresh-stats.yml` runs the weekly refresh.

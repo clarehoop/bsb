@@ -69,3 +69,47 @@ export function makeRater(defenders) {
     return out;
   };
 }
+
+// ---------- Offense ----------
+// One overall rating per skill player, from the same percentile-and-shrink method.
+// Offensive linemen have no individual stats, so the app rates them from their team's
+// sack rate and rushing success instead.
+export const ORANGES = { QB: [68, 96], RB: [64, 92], WR: [62, 95], TE: [60, 90] };
+const OREG = {
+  QB: s => s.att / s.gp >= 15, RB: s => s.car / s.gp >= 6,
+  WR: s => s.tgt / s.gp >= 3.5, TE: s => s.tgt / s.gp >= 2.5,
+};
+// [metric, weight]; percentiles are blended by weight.
+const OMETRICS = {
+  QB: [[s => (s.pyds - s.skYds + 20 * s.ptd - 45 * s.int) / Math.max(1, s.att + s.sk) + 0.01 * s.ryds / s.gp, 1]],
+  RB: [[s => s.ryds / Math.max(1, s.car), 0.45], [s => (s.ryds + s.reyds) / s.gp, 0.55]],
+  WR: [[s => (s.reyds + 20 * s.retd) / Math.max(1, s.tgt), 0.4], [s => s.reyds / s.gp, 0.6]],
+  TE: [[s => (s.reyds + 20 * s.retd) / Math.max(1, s.tgt), 0.4], [s => s.reyds / s.gp, 0.6]],
+};
+const OTRUST = { QB: s => s.att / (s.att + 90), RB: s => s.car / (s.car + 40), WR: s => s.tgt / (s.tgt + 20), TE: s => s.tgt / (s.tgt + 20) };
+
+export function makeOffRater(offense) {
+  const dist = {};
+  for (const pos of Object.keys(ORANGES)) dist[pos] = OMETRICS[pos].map(() => []);
+  for (const s of Object.values(offense || {})) {
+    if (!dist[s.pos] || s.gp < 2 || !OREG[s.pos](s)) continue;
+    OMETRICS[s.pos].forEach(([f], i) => dist[s.pos][i].push(f(s)));
+  }
+  for (const p in dist) for (const a of dist[p]) a.sort((x, y) => x - y);
+  const pct = (v, arr) => {
+    if (!arr.length) return 0.5;
+    let lo = 0, hi = arr.length;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (arr[m] < v) lo = m + 1; else hi = m; }
+    return lo / arr.length;
+  };
+  return function rateOff(id, pos) {
+    const R = ORANGES[pos]; if (!R) return { rt: 60, basis: "no stats" };
+    const [lo, hi] = R, backup = lo + BACKUP * (hi - lo);
+    const s = offense?.[id];
+    if (!s || !s.gp) return { rt: Math.round(backup), basis: "no stats" };
+    let p = 0; OMETRICS[pos].forEach(([f, w], i) => { p += w * pct(f(s), dist[pos][i]); });
+    const raw = lo + p * (hi - lo);
+    const trust = Math.min(1, OTRUST[pos](s) * (s.gp / (s.gp + 1)));
+    return { rt: Math.round(backup + (raw - backup) * trust), basis: `${s.gp} G of stats` };
+  };
+}

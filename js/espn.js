@@ -18,6 +18,8 @@ export const DEF_POS = {
   WLB: "LB", SLB: "LB", CB: "CB", DB: "CB", S: "S", SS: "S", FS: "S", SAF: "S",
 };
 
+export const OFF_POS = { QB: "QB", RB: "RB", FB: "RB", HB: "RB", WR: "WR", TE: "TE", OT: "OL", T: "OL", G: "OL", OG: "OL", C: "OL", OL: "OL" };
+
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function getJSON(url, tries = 3) {
   for (let i = 0; i < tries; i++) {
@@ -119,12 +121,36 @@ export async function fetchLeague({ onProgress = () => {} } = {}) {
         ff: v["general.fumblesForced"] || 0,
       };
     }
-    onProgress("Defender stats", 0.6 + 0.38 * page / (d?.pagination?.pages || 3));
+    onProgress("Defender stats", 0.6 + 0.3 * page / (d?.pagination?.pages || 3));
+    if (!d || page >= (d.pagination?.pages || 1)) break;
+  }
+
+  // Every skill player's passing, rushing and receiving (2 pages of 500)
+  onProgress("Offense player stats", 0.9);
+  const offense = {};
+  for (let page = 1; page <= 4; page++) {
+    const d = await getJSON(`${WEB}/statistics/byathlete?region=us&lang=en&isqualified=false&limit=500&page=${page}&category=offense&season=${season}&seasontype=2`);
+    const names = {}; for (const c of d?.categories || []) names[c.name] = c.names || [];
+    for (const a of d?.athletes || []) {
+      const at = a.athlete || {};
+      const pos = OFF_POS[at.position?.abbreviation];
+      if (!pos || pos === "OL") continue;
+      const v = {};
+      for (const c of a.categories || []) (names[c.name] || []).forEach((n, i) => { v[c.name + "." + n] = toNum(c.totals?.[i]); });
+      offense[String(at.id)] = {
+        name: at.displayName, pos, team: at.teamShortName, gp: v["general.gamesPlayed"] || 0,
+        att: v["passing.passingAttempts"] || 0, cmp: v["passing.completions"] || 0, pyds: v["passing.passingYards"] || 0,
+        ptd: v["passing.passingTouchdowns"] || 0, int: v["passing.interceptions"] || 0, sk: v["passing.sacks"] || 0, skYds: v["passing.sackYardsLost"] || 0,
+        car: v["rushing.rushingAttempts"] || 0, ryds: v["rushing.rushingYards"] || 0, rtd: v["rushing.rushingTouchdowns"] || 0,
+        tgt: v["receiving.receivingTargets"] || 0, rec: v["receiving.receptions"] || 0, reyds: v["receiving.receivingYards"] || 0,
+        retd: v["receiving.receivingTouchdowns"] || 0, fum: v["rushing.rushingFumblesLost"] + v["receiving.receivingFumblesLost"] || 0,
+      };
+    }
     if (!d || page >= (d.pagination?.pages || 1)) break;
   }
 
   onProgress("Done", 1);
-  return { source: "ESPN public feeds", fetchedAt: new Date().toISOString(), season, week: curWeek, teams, defenders };
+  return { source: "ESPN public feeds", fetchedAt: new Date().toISOString(), season, week: curWeek, teams, defenders, offense };
 }
 
 export async function fetchTeam(abbr) {
@@ -137,28 +163,31 @@ export async function fetchTeam(abbr) {
   ]);
 
   const players = [];
-  const statusOf = { defense: "active", injuredReserveOrOut: "out", suspended: "out", practiceSquad: "ps" };
+  const statusOf = { offense: "active", defense: "active", injuredReserveOrOut: "out", suspended: "out", practiceSquad: "ps" };
   for (const g of roster?.athletes || []) {
     const status = statusOf[g.position];
     if (!status) continue;
     for (const a of g.items || []) {
-      const pos = DEF_POS[a.position?.abbreviation];
+      const abbrPos = a.position?.abbreviation;
+      const pos = DEF_POS[abbrPos] || OFF_POS[abbrPos];
       if (!pos) continue;
-      players.push({ id: String(a.id), name: a.displayName, pos, status,
+      players.push({ id: String(a.id), name: a.displayName, pos, side: DEF_POS[abbrPos] ? "D" : "O", status,
         injury: a.injuries?.[0]?.status || a.injuries?.[0]?.type?.description || null });
     }
   }
 
   // Defensive depth chart, raw: {key: [ids]}; offense: starter names
-  let scheme = null; const dkeys = {}; const offense = {};
+  let scheme = null; const dkeys = {}; const offense = {}; const okeys = {};
   for (const chart of depth?.depthchart || []) {
     const pos = chart.positions || {};
     if (pos.lcb || pos.fs) {
       scheme = pos.nt || pos.lilb ? "3-4" : "4-3";
       for (const [k, v] of Object.entries(pos)) dkeys[k] = (v.athletes || []).map(a => String(a.id));
     }
-    if (pos.qb && pos.wr1) for (const k of ["qb", "wr1", "wr2", "wr3", "te", "rb", "lt", "lg", "c", "rg", "rt"])
+    if (pos.qb && pos.wr1) for (const k of ["qb", "wr1", "wr2", "wr3", "te", "rb", "lt", "lg", "c", "rg", "rt"]) {
       offense[k] = pos[k]?.athletes?.[0]?.displayName || null;
+      okeys[k] = (pos[k]?.athletes || []).map(a => String(a.id));
+    }
   }
 
   const schedule = (sched?.events || []).map(e => {
@@ -171,5 +200,5 @@ export async function fetchTeam(abbr) {
   });
 
   return { abbr, id: String(id), name: roster?.team?.name || abbr, fetchedAt: new Date().toISOString(),
-    season: sched?.requestedSeason?.year || null, players, scheme, depth: dkeys, offense, schedule };
+    season: sched?.requestedSeason?.year || null, players, scheme, depth: dkeys, offense, odepth: okeys, schedule };
 }

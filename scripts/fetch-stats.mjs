@@ -9,8 +9,8 @@ const dataDir = join(root, "data");
 let last = "";
 const league = await fetchLeague({ onProgress: msg => { if (msg !== last) { console.log("·", msg); last = msg; } } });
 const nDef = Object.keys(league.defenders).length, nTeams = Object.keys(league.teams).length;
-console.log(`Season ${league.season}, week ${league.week}: ${nTeams} teams, ${nDef} defenders with stats`);
-if (nTeams < 32 || nDef < 300) { console.error("League data looks incomplete; not writing."); process.exit(1); }
+console.log(`Season ${league.season}, week ${league.week}: ${nTeams} teams, ${nDef} defenders and ${Object.keys(league.offense).length} skill players with stats`);
+if (nTeams < 32 || nDef < 300 || Object.keys(league.offense).length < 150) { console.error("League data looks incomplete; not writing."); process.exit(1); }
 
 const teams = {};
 for (const abbr of Object.keys(TEAM_IDS)) {

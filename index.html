@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Bengals Defense Lab</title>
+<title>Bengals Lineup Lab</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -64,6 +64,11 @@ h2{font-family:var(--display);font-weight:800;text-transform:uppercase;font-size
 .r3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .r2{grid-template-columns:1fr 1fr;padding:0 12%}
 .r4b{grid-template-columns:repeat(4,minmax(0,1fr))}
+.r5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.tabs{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;margin-bottom:12px}
+.tabs button{background:var(--surface-2);color:var(--ink);border:0;padding:7px 16px;font:700 14px var(--body);cursor:pointer;letter-spacing:.02em}
+.tabs button+button{border-left:1px solid var(--line)}
+.tabs button[aria-pressed="true"]{background:var(--orange);color:#fff}
 .slot{background:var(--chip);border:1px solid var(--chip-line);border-radius:6px;padding:6px 7px 7px;min-width:0;position:relative}
 .slot.flag-bad{box-shadow:inset 0 -3px 0 var(--bad)}
 .slot.flag-good{box-shadow:inset 0 -3px 0 var(--good)}
@@ -132,7 +137,7 @@ details.pool[open] summary h2::after{content:" –"}
 .addform input,.addform select{width:100%}
 @media (max-width:640px){.addform{grid-template-columns:repeat(3,minmax(0,1fr))}.addform label:first-child{grid-column:1/-1}}
 @media (prefers-reduced-motion:reduce){.progress i{transition:none}}
-@media (max-width:520px){.r4,.r4b{grid-template-columns:repeat(2,minmax(0,1fr))}.r2{padding:0}.r3{grid-template-columns:repeat(3,minmax(0,1fr))}.bar{width:80px}}
+@media (max-width:520px){.r4,.r4b{grid-template-columns:repeat(2,minmax(0,1fr))}.r5{grid-template-columns:repeat(3,minmax(0,1fr))}.r2{padding:0}.r3{grid-template-columns:repeat(3,minmax(0,1fr))}.bar{width:80px}}
 </style>
 </head>
 <body>
@@ -141,13 +146,15 @@ details.pool[open] summary h2::after{content:" –"}
   <canvas id="stripes" aria-hidden="true"></canvas>
   <div class="wrap">
     <div>
-      <h1><span id="team-name">Bengals</span><br>Defense Lab</h1>
-      <p>The offense stays put. Swap defenders in and out, run simulated games against other NFL offenses, and see who is costing you points.</p>
+      <h1><span id="team-name">Bengals</span><br>Lineup Lab</h1>
+      <p>Set the lineup on both sides of the ball, simulate games against real NFL rosters, and see which players are costing you points.</p>
       <label class="teampick" for="team">Team <select id="team"></select></label>
     </div>
     <div class="offense" aria-label="Locked Bengals offense">
-      <b>Offense</b><span class="lock">Locked</span>
-      <div class="names" id="off-names">QB Joe Burrow · WR Ja'Marr Chase, Tee Higgins, Dohnte Meyers · RB Chase Brown · TE Mike Gesicki · OL Orlando Brown Jr., Dylan Fairchild, Ted Karras, Dalton Risner, Amarius Mims</div>
+      <b>Offense</b>
+      <div class="names" id="off-names">QB Joe Burrow · WR Ja'Marr Chase, Tee Higgins, Dohnte Meyers · RB Chase Brown · TE Mike Gesicki</div>
+      <b style="display:block;margin-top:6px">Defense</b>
+      <div class="names" id="def-names">Edge Boye Mafe, Myles Murphy · DT Dexter Lawrence II, Jonathan Allen</div>
     </div>
   </div>
 </header>
@@ -155,18 +162,19 @@ details.pool[open] summary h2::after{content:" –"}
 <main class="wrap">
   <div class="col">
     <section class="panel" aria-labelledby="h-form">
-      <h2 id="h-form">Defensive lineup</h2>
-      <p class="sub">Nickel 4-2-5. Pick a player for each spot. The colored underline shows the last simulation's verdict.</p>
+      <div class="tabs" id="mode-tabs" role="group" aria-label="Side of the ball">
+        <button type="button" data-mode="D" aria-pressed="true">Defense</button>
+        <button type="button" data-mode="O" aria-pressed="false">Offense</button>
+      </div>
+      <h2 id="h-form"><span id="lineup-title">Defensive lineup</span></h2>
+      <p class="sub" id="lineup-sub">Nickel 4-2-5. Pick a player for each spot. The colored underline shows the last simulation's verdict.</p>
       <div class="field" id="field">
         <div class="los"></div>
-        <div class="offband"><span>▲ Opposing offense</span></div>
-        <div class="row r4" id="row-dl"></div>
-        <div class="row r2" id="row-lb"></div>
-        <div class="row r3" id="row-cb"></div>
-        <div class="row r2" id="row-s"></div>
+        <div class="offband"><span id="offband">▲ Opposing offense</span></div>
+        <div id="rows"></div>
       </div>
       <div class="ctrl-row" style="margin-top:12px">
-        <button class="linkbtn" id="reset-lineup" type="button">Reset to projected starters</button>
+        <button class="linkbtn" id="reset-lineup" type="button">Reset to depth chart</button>
       </div>
     </section>
 
@@ -195,20 +203,21 @@ details.pool[open] summary h2::after{content:" –"}
     <section class="panel">
       <details class="pool" id="pool">
         <summary><h2>Player pool &amp; ratings</h2><span class="label">Edit</span></summary>
-        <p class="sub" style="margin-top:8px">Ratings use a 40–99 scale. Bengals ratings are hand-set; every other team's come from this season's public stats. Change any number to match your own scouting, or add a player you'd like to try. Edits are saved in this browser, separately for each team.</p>
+        <p class="sub" style="margin-top:8px">Ratings use a 40–99 scale. Defenders have four ratings, offensive players one. Bengals ratings are hand-set; every other team's come from this season's public stats. Change any number to match your own scouting, or add a player you'd like to try. Edits are saved in this browser, separately for each team.</p>
         <div class="scroll">
           <table>
-            <thead><tr><th>Player · season</th><th>Pos</th><th class="n" title="Pass rush">Rush</th><th class="n" title="Run defense">Run</th><th class="n" title="Coverage">Cov</th><th class="n" title="Tackling">Tkl</th><th></th></tr></thead>
+            <thead id="pool-head"></thead>
             <tbody id="pool-body"></tbody>
           </table>
         </div>
         <form class="addform" id="addform">
           <label>Name<input class="std" id="add-name" required placeholder="e.g. Free-agent edge"></label>
           <label>Pos<select class="std" id="add-pos"><option>DE</option><option>DT</option><option>LB</option><option>CB</option><option>S</option></select></label>
-          <label>Rush<input class="std" id="add-pr" type="number" min="30" max="99" value="70"></label>
-          <label>Run<input class="std" id="add-rs" type="number" min="30" max="99" value="70"></label>
-          <label>Cov<input class="std" id="add-cov" type="number" min="30" max="99" value="70"></label>
-          <label>Tkl<input class="std" id="add-tk" type="number" min="30" max="99" value="70"></label>
+          <label id="lab-pr">Rush<input class="std" id="add-pr" type="number" min="30" max="99" value="70"></label>
+          <label id="lab-rs">Run<input class="std" id="add-rs" type="number" min="30" max="99" value="70"></label>
+          <label id="lab-cov">Cov<input class="std" id="add-cov" type="number" min="30" max="99" value="70"></label>
+          <label id="lab-tk">Tkl<input class="std" id="add-tk" type="number" min="30" max="99" value="70"></label>
+          <label id="lab-rt" hidden>Rating<input class="std" id="add-rt" type="number" min="30" max="99" value="75"></label>
           <button class="btn ghost" type="submit">Add</button>
         </form>
         <div class="ctrl-row"><button class="linkbtn" id="reset-pool" type="button">Restore default ratings</button></div>
@@ -233,7 +242,7 @@ details.pool[open] summary h2::after{content:" –"}
       <div class="tiles" id="tiles"></div>
       <div class="scroll" style="margin-top:14px">
         <table>
-          <thead><tr><th>Opponent</th><th class="n">Win %</th><th class="n">Avg score</th><th class="n">Pts allowed</th><th class="n">Yds/play</th><th class="n">Pass Y/A</th><th class="n">Rush Y/C</th></tr></thead>
+          <thead><tr><th>Opponent</th><th class="n">Win %</th><th class="n">Avg score</th><th class="n" title="Your offense, yards per play">Off Y/P</th><th class="n" title="Your defense, yards per play allowed">Def Y/P</th><th class="n" title="Pass yards per attempt allowed">Pass Y/A</th><th class="n" title="Rush yards per carry allowed">Rush Y/C</th></tr></thead>
           <tbody id="opp-body"></tbody>
         </table>
       </div>
@@ -241,26 +250,26 @@ details.pool[open] summary h2::after{content:" –"}
 
     <section class="panel" aria-labelledby="h-swap">
       <h2 id="h-swap">Best swaps</h2>
-      <p class="sub">Every bench player and free-agent option was tried in every spot they can play, against the same simulated games. Ranked by points saved per game.</p>
+      <p class="sub" id="swap-sub">Every bench player and free-agent option was tried in every spot they can play, against the same simulated games.</p>
       <div class="swaps" id="swaps"><div class="empty">Waiting for simulation…</div></div>
     </section>
 
     <section class="panel" aria-labelledby="h-rep">
       <h2 id="h-rep">Player report</h2>
-      <p class="sub">Value compares each starter to a league-average player at the same spot. Negative means that spot is giving up extra points.</p>
+      <p class="sub" id="rep-sub">Value compares each starter to a league-average player at the same spot.</p>
       <div class="scroll">
         <table>
           <thead><tr><th>Spot</th><th>Player</th><th>Value (pts/game)</th><th class="n"></th><th>Simulated per game</th><th>Verdict</th></tr></thead>
           <tbody id="rep-body"></tbody>
         </table>
       </div>
-      <p class="note">Game results are a model, not a forecast. Bengals ratings are hand-set, and season stats nudge them by up to 6 points. Other teams are rated from ESPN stats against every defender in the league. Edit any rating in the player pool.</p>
+      <p class="note">Game results are a model, not a forecast. Bengals ratings are hand-set, and season stats nudge the defenders by up to 6 points. Other teams are rated from ESPN stats against every player in the league; offensive linemen are rated from their team's sack rate and rushing success. Edit any rating in the player pool.</p>
     </section>
   </div>
 </main>
 
 <script type="module">
-import { makeRater, statRole } from "./js/ratings.js?v=3";
+import { makeRater, statRole, makeOffRater } from "./js/ratings.js?v=4";
 /* ---------- data ---------- */
 // Bengals hand-set ratings (40–99): [espnId, name, pos, passRush, runD, coverage, tackling].
 // Every other team is rated from public stats by js/ratings.js.
@@ -320,6 +329,36 @@ const SLOTS = [
   {id:"S1",label:"FS",group:"S",accepts:["S","CB"],row:"s"},
   {id:"S2",label:"SS",group:"S",accepts:["S","CB"],row:"s"},
 ];
+// Bengals offense, hand-set: [espnId, name, pos, rating]. Other teams are rated from stats.
+const OFF_POOL = [
+  ["3915511","Joe Burrow","QB",93],["11252","Joe Flacco","QB",74],["11394","Josh Johnson","QB",62],
+  ["4362238","Chase Brown","RB",81],["3116389","Samaje Perine","RB",71],["4429299","Tahj Brooks","RB",67],
+  ["4362628","Ja'Marr Chase","WR",95],["4239993","Tee Higgins","WR",88],["4368003","Andrei Iosivas","WR",76],["4384852","Dohnte Meyers","WR",71],["5092508","Colbie Young","WR",66],["4690070","Mitchell Tinsley","WR",65],
+  ["3116164","Mike Gesicki","TE",76],["4427834","Erick All Jr.","TE",73],["3127310","Drew Sample","TE",66],["5085189","Jack Endries","TE",64],["3050481","Tanner Hudson","TE",62],["4700712","Cam Grandy","TE",60],
+  ["3116370","Orlando Brown Jr.","OL",81],["4431571","Amarius Mims","OL",80],["2576188","Ted Karras","OL",77],["4646773","Dylan Fairchild","OL",75],["3125082","Dalton Risner","OL",75],
+  ["4429010","Jalen Rivers","OL",71],["4362769","Javon Foster","OL",70],["4429000","Myles Hinton","OL",69],["4879478","Jacob Bayer","OL",68],["4870866","Connor Lew","OL",68],["4689117","Brian Parker II","OL",67],
+];
+const OFF_OUT_DEFAULT = new Set(["4427834","3050481","4368003","4689117"]);
+const OFF_FA = [
+  ["fa-qb","Veteran QB","QB",84],["fa-wr","No. 1 receiver","WR",90],["fa-slot","Slot receiver","WR",82],["fa-te","Receiving tight end","TE",84],
+  ["fa-rb","Every-down back","RB",86],["fa-ot","Pro Bowl tackle","OL",86],["fa-iol","Road-grading guard","OL",83],
+];
+const OSLOTS = [
+  {id:"QB",label:"QB",group:"QB",accepts:["QB"],row:"bf",side:"O"},
+  {id:"RB",label:"RB",group:"RB",accepts:["RB"],row:"bf",side:"O"},
+  {id:"W1",label:"WR1",group:"WR",accepts:["WR"],row:"wr",side:"O"},
+  {id:"TE",label:"TE",group:"TE",accepts:["TE"],row:"wr",side:"O"},
+  {id:"W3",label:"SLOT",group:"WR",accepts:["WR","TE","RB"],row:"wr",side:"O"},
+  {id:"W2",label:"WR2",group:"WR",accepts:["WR"],row:"wr",side:"O"},
+  {id:"LT",label:"LT",group:"OL",accepts:["OL"],row:"ol",side:"O"},
+  {id:"LG",label:"LG",group:"OL",accepts:["OL"],row:"ol",side:"O"},
+  {id:"C",label:"C",group:"OL",accepts:["OL"],row:"ol",side:"O"},
+  {id:"RG",label:"RG",group:"OL",accepts:["OL"],row:"ol",side:"O"},
+  {id:"RT",label:"RT",group:"OL",accepts:["OL"],row:"ol",side:"O"},
+];
+const DEFAULT_OLINEUP = {QB:"3915511",RB:"4362238",W1:"4362628",TE:"3116164",W3:"4384852",W2:"4239993",LT:"3116370",LG:"4646773",C:"2576188",RG:"3125082",RT:"4431571"};
+// League-average starter at each offensive spot
+const OAVG = {QB:82,RB:80,W1:82,W2:77,W3:75,TE:76,LT:77,LG:77,C:77,RG:77,RT:77};
 const DEFAULT_LINEUP = {E1:"4240754",D1:"4035483",D2:"3054840",E2:"4428985",L1:"4431519",L2:"4427729",C1:"4726127",NB:"4426422",C2:"4572036",S1:"4247726",S2:"4567098"};
 const AVG = {DE:{pr:70,rs:70,cov:42,tk:70},DT:{pr:62,rs:72,cov:32,tk:70},LB:{pr:52,rs:69,cov:65,tk:71},CB:{pr:30,rs:58,cov:72,tk:66},S:{pr:40,rs:70,cov:70,tk:72}};
 // Per-game rates an average starter posts, used to turn season stats into rating nudges.
@@ -357,13 +396,16 @@ let useLive = true, lineupCustom = false;
 let edits = {}, custom = {};
 let pool = {}, OPPS = [];
 let lineup = {...DEFAULT_LINEUP};
+let olineup = {...DEFAULT_OLINEUP}, olineupCustom = false;
+let mode = "D";                        // which lineup is being edited: "D" or "O"
+let rateOff = null;
 let selectedOpps = null;
 let notices = [];
 let byTeam = {};
 try{
   const saved = JSON.parse(localStorage.getItem(LS_KEY)||"null");
   if(saved){
-    byTeam = saved.byTeam||{}; if(TEAMS[saved.team]) team = saved.team;
+    byTeam = saved.byTeam||{}; if(TEAMS[saved.team]) team = saved.team; if(saved.mode==="O") mode="O";
     if(typeof saved.useLive==="boolean") useLive = saved.useLive;
   } else {
     const v2 = JSON.parse(localStorage.getItem("bengals-defense-lab-v2")||"null"); // keep earlier Bengals edits
@@ -374,21 +416,30 @@ function loadTeamState(){
   const ts = byTeam[team] || {};
   edits = ts.edits||{}; custom = ts.custom||{}; lineupCustom = !!ts.lineupCustom;
   lineup = ts.lineup ? {...ts.lineup} : (team==="CIN" ? {...DEFAULT_LINEUP} : {});
+  olineup = ts.olineup ? {...ts.olineup} : (team==="CIN" ? {...DEFAULT_OLINEUP} : {}); olineupCustom = !!ts.olineupCustom;
   selectedOpps = Array.isArray(ts.opps) && ts.opps.length ? new Set(ts.opps.filter(id=>TEAMS[id] && id!==team)) : null;
 }
 function save(){
-  byTeam[team] = {edits, custom, lineup, lineupCustom, opps:[...(selectedOpps||[])]};
-  try{ localStorage.setItem(LS_KEY, JSON.stringify({team, useLive, byTeam})); }catch(e){}
+  byTeam[team] = {edits, custom, lineup, lineupCustom, olineup, olineupCustom, opps:[...(selectedOpps||[])]};
+  try{ localStorage.setItem(LS_KEY, JSON.stringify({team, mode, useLive, byTeam})); }catch(e){}
 }
 loadTeamState();
 
 function composeSnap(){
   if(!league || !tdata){ snap=null; return; }
   snap = { season: league.season, fetchedAt: [league.fetchedAt, tdata.fetchedAt].sort()[0],
-    teams: league.teams, defStats: league.defenders, schedule: tdata.schedule, offense: tdata.offense,
+    teams: league.teams, defStats: league.defenders, offStats: league.offense||{}, schedule: tdata.schedule, offense: tdata.offense,
     players: tdata.players, scheme: tdata.scheme, depth: tdata.depth };
   snap.roles = depthRoles(tdata);
-  snap.lineup = depthLineup(tdata);
+  const out = new Set((tdata.players||[]).filter(p=>p.status!=="active").map(p=>p.id));
+  snap.lineup = depthLineup(tdata, out);
+  snap.olineup = depthOLineup(tdata, out);
+}
+function depthOLineup(t, skip=new Set()){
+  const d=t.odepth||{}, used=new Set(), out={};
+  const keys={QB:"qb",RB:"rb",W1:"wr1",W2:"wr2",W3:"wr3",TE:"te",LT:"lt",LG:"lg",C:"c",RG:"rg",RT:"rt"};
+  for(const s of OSLOTS){ const id=(d[keys[s.id]]||[]).find(x=>!used.has(x)&&!skip.has(x)); if(id){ out[s.id]=id; used.add(id); } }
+  return out;
 }
 // Roles from the depth chart: in a 3-4, outside linebackers rush the edge and ends play inside.
 function depthRoles(t){
@@ -398,47 +449,106 @@ function depthRoles(t){
   set(["lcb","rcb","nb"],"CB"); set(["fs","ss"],"S");
   return r;
 }
-function depthLineup(t){
+function depthLineup(t, skip=new Set()){
   const d=t.depth||{}, used=new Set(), out={};
   const keys = t.scheme==="3-4"
     ? {E1:["wlb","lolb"],D1:["lde"],D2:["rde","nt"],E2:["slb","rolb"],L1:["lilb","mlb"],L2:["rilb","mlb"]}
     : {E1:["lde"],D1:["ldt","nt"],D2:["rdt","nt"],E2:["rde"],L1:["mlb","slb"],L2:["wlb","slb"]};
   Object.assign(keys,{C1:["lcb"],C2:["rcb"],NB:["nb"],S1:["fs"],S2:["ss"]});
-  for(const s of SLOTS) for(const k of keys[s.id]||[]){ const id=(d[k]||[]).find(x=>!used.has(x)); if(id){ out[s.id]=id; used.add(id); break; } }
+  for(const s of SLOTS) for(const k of keys[s.id]||[]){ const id=(d[k]||[]).find(x=>!used.has(x)&&!skip.has(x)); if(id){ out[s.id]=id; used.add(id); break; } }
   return out;
 }
 
 // Calibration for stat-rated players: a lift to league-average level, plus a team factor
 // from the defense's real points allowed (good defenses play better than their box scores).
-let STAT_LIFT = 5.5, TEAM_DEF_K = 2;
-function teamDefAdj(){
-  const t=snap?.teams?.[team]; if(!t || !t.gp || typeof t.papg!=="number") return STAT_LIFT;
+let STAT_LIFT = 5.5, TEAM_DEF_K = 2, OFF_LIFT = 4, TEAM_OFF_K = 1;
+function teamDefAdj(abbr=team){
+  const t=snap?.teams?.[abbr]; if(!t || !t.gp || typeof t.papg!=="number") return STAT_LIFT;
   const L=leagueStats(), dz=(t.papg-L.papg.m)/L.papg.sd, w=t.gp/(t.gp+3);
   return Math.round(STAT_LIFT - clamp(dz,-2.5,2.5)*TEAM_DEF_K*w);
+}
+// Offense: skill players from stats, plus a team factor from real points scored.
+function teamOffAdj(abbr=team){
+  const t=snap?.teams?.[abbr]; if(!t || !t.gp || typeof t.ppg!=="number") return OFF_LIFT;
+  const L=leagueStats(), z=(t.ppg-L.ppg.m)/L.ppg.sd, w=t.gp/(t.gp+3);
+  return Math.round(OFF_LIFT + clamp(z,-2.5,2.5)*TEAM_OFF_K*w);
+}
+// Offensive line from team sack rate and rushing success (no individual line stats exist).
+function olTeam(abbr=team){
+  const t=snap?.teams?.[abbr]; if(!t || !t.gp) return 76;
+  const L=leagueStats(), z=(v,k)=>typeof v==="number"?(v-L[k].m)/L[k].sd:0, w=t.gp/(t.gp+3);
+  return Math.round(76 + w*(-z(t.sackRate,"sackRate")*3 + z(t.ypc,"ypc")*2.5));
+}
+function offRating(abbr, id, pos, starter){
+  if(pos==="OL") return {rt: olTeam(abbr) - (starter?0:7) + teamOffAdj(abbr), basis: starter?"team line stats":"team line stats, backup"};
+  const r = rateOff ? rateOff(id,pos) : {rt:70,basis:"no stats"};
+  return {rt: clamp(r.rt + teamOffAdj(abbr),40,99), basis:r.basis};
 }
 function buildPool(){
   pool = {};
   const tAdj = snap ? teamDefAdj() : 0;
   const mk=(r,src,status)=>({id:r[0],name:r[1],pos:r[2],pr:r[3],rs:r[4],cov:r[5],tk:r[6],src,status,injury:null});
-  if(team==="CIN") DEFAULT_POOL.forEach(r=>pool[r[0]]=mk(r,"roster",OUT_DEFAULT.has(r[0])?"out":"active"));
+  const mkO=(r,src,status)=>({id:r[0],name:r[1],pos:r[2],rt:r[3],side:"O",src,status,injury:null});
+  if(team==="CIN"){
+    DEFAULT_POOL.forEach(r=>pool[r[0]]={...mk(r,"roster",OUT_DEFAULT.has(r[0])?"out":"active"),side:"D"});
+    OFF_POOL.forEach(r=>pool[r[0]]=mkO(r,"roster",OFF_OUT_DEFAULT.has(r[0])?"out":"active"));
+  }
   if(snap){
     const live = new Map((snap.players||[]).map(p=>[p.id,p]));
     for(const p of Object.values(pool)){ const lp=live.get(p.id); if(!lp){ p.status="gone"; continue; } p.status=lp.status; p.injury=lp.injury; p.name=lp.name; }
+    const olStarters=new Set(["lt","lg","c","rg","rt"].map(k=>tdata?.odepth?.[k]?.[0]).filter(Boolean));
     for(const lp of live.values()){
       if(pool[lp.id]) continue;
+      if(lp.side==="O"){
+        const r=offRating(team, lp.id, lp.pos, olStarters.has(lp.id));
+        pool[lp.id]={id:lp.id,name:lp.name,pos:lp.pos,rt:r.rt,side:"O",src:"roster",status:lp.status,injury:lp.injury,statRated:true,basis:r.basis};
+        continue;
+      }
       const st=snap.defStats?.[lp.id];
       const role = snap.roles?.[lp.id] || (st ? statRole(st) : lp.pos);
       if(!AVG[role]) continue;
       const r = rate ? rate(lp.id, role) : {...AVG[role], basis:"no stats"};
       const adj=k=>clamp(r[k]+tAdj,30,99);
-      pool[lp.id]={id:lp.id,name:lp.name,pos:role,pr:adj("pr"),rs:adj("rs"),cov:adj("cov"),tk:adj("tk"),src:"roster",status:lp.status,injury:lp.injury,statRated:true,basis:r.basis,teamAdj:tAdj};
+      pool[lp.id]={id:lp.id,name:lp.name,pos:role,pr:adj("pr"),rs:adj("rs"),cov:adj("cov"),tk:adj("tk"),side:"D",src:"roster",status:lp.status,injury:lp.injury,statRated:true,basis:r.basis,teamAdj:tAdj};
     }
   }
-  FA_POOL.forEach(r=>pool[r[0]]=mk(r,"fa","active"));
-  for(const c of Object.values(custom)) if(c&&c.id&&AVG[c.pos]) pool[c.id]={...c,src:"custom",status:"active"};
+  FA_POOL.forEach(r=>pool[r[0]]={...mk(r,"fa","active"),side:"D"});
+  OFF_FA.forEach(r=>pool[r[0]]=mkO(r,"fa","active"));
+  for(const c of Object.values(custom)) if(c&&c.id){ if(AVG[c.pos]) pool[c.id]={...c,side:"D",src:"custom",status:"active"}; else if(OAVG_POS[c.pos]) pool[c.id]={...c,side:"O",src:"custom",status:"active"}; }
   for(const [id,e] of Object.entries(edits)) if(pool[id]) Object.assign(pool[id], e, {edited:true});
 }
+const OAVG_POS = {QB:1,RB:1,WR:1,TE:1,OL:1};
 const available = p => p && p.status!=="out" && p.status!=="gone";
+
+// Opponent defenses: their real depth-chart starters, rated the same way as yours.
+const oppFiles = {};
+function oppDefenseArray(abbr){
+  const f = abbr===team ? tdata : oppFiles[abbr]; if(!f) return null;
+  const out=new Set((f.players||[]).filter(p=>p.status!=="active").map(p=>p.id));
+  const roles=depthRoles(f), lu=depthLineup(f,out), adj=teamDefAdj(abbr);
+  return SLOTS.map(s=>{
+    const id=lu[s.id]; if(!id) return {...AVG[s.group]};
+    if(abbr==="CIN"){ const row=DEFAULT_POOL.find(x=>x[0]===id); if(row) return {pr:row[3],rs:row[4],cov:row[5],tk:row[6]}; }
+    const st=snap?.defStats?.[id], role=roles[id]||(st?statRole(st):s.group);
+    const r=rate?rate(id, AVG[role]?role:s.group):{...AVG[s.group]}, pen=role===s.group?0:5;
+    return {pr:r.pr+adj-pen, rs:r.rs+adj-pen, cov:r.cov+adj-pen, tk:r.tk+adj-pen};
+  });
+}
+// Your offense as the engine sees it, from 11 slot ratings (OSLOTS order).
+function offenseFrom(rts){
+  const g=id=>rts[OSLOTS.findIndex(s=>s.id===id)];
+  const olArr=["LT","LG","C","RG","RT"].map(g);
+  const t=snap?.teams?.[team];
+  const pass = typeof t?.passRate==="number" ? clamp(t.passRate-0.03,.4,.68) : (team==="CIN"?.6:.55);
+  return {qb:g("QB"), rb:g("RB"), wr1:g("W1"), wr2:g("W2"), slot:g("W3"), te:g("TE"),
+    ol:(olArr[0]*1.25+olArr[1]+olArr[2]+olArr[3]+olArr[4]*1.15)/5.4, olArr, pass};
+}
+function effO(p, slot){
+  if(!p) return 55;
+  const pen = p.pos===slot.group ? 0 : (slot.accepts.includes(p.pos) ? 6 : 15);
+  return p.rt - pen;
+}
+function olineupRatings(lu){ return OSLOTS.map(s=>effO(pool[lu[s.id]], s)); }
 // Hand-rated (Bengals) players get nudged by season stats; stat-rated players already are.
 function liveAdj(p){
   if(!useLive || !snap || p.src!=="roster" || p.statRated) return null;
@@ -509,7 +619,7 @@ function applyTeamColors(){
   root.setProperty("--band-ink", lum(p)>0.45 ? "#111111" : "#ffffff");
   root.setProperty("--band-stripe", toHex(contrast(a,p)>1.6 ? a : (lum(p)>0.3?[0,0,0]:[255,255,255])));
   $("team-name").textContent = TEAMS[team];
-  document.title = `${TEAMS[team]} Defense Lab`;
+  document.title = `${TEAMS[team]} Lineup Lab`;
   drawStripes();
 }
 
@@ -536,32 +646,40 @@ function prepare(lp){
 const RUSHERS=[0,3,1,2], GAPS=[0,3,1,2,4,5], GAPW=[.17,.17,.21,.21,.13,.11];
 function newStats(){ return SLOTS.map(()=>({press:0,sacks:0,tgt:0,comp:0,yds:0,ints:0,pbu:0,runs:0,runYds:0,stuff:0,tkl:0,miss:0})); }
 function newTeam(){ return {games:0,wins:0,bpts:0,opts:0,plays:0,yds:0,passAtt:0,passYds:0,runs:0,runYds:0,sacks:0,takeaways:0}; }
-const U = new Float64Array(16);
-
-function simPlay(L, o, rng, st, T, down, toGo){
-  for(let i=0;i<16;i++) U[i]=rng();
+function newOStats(){ return OSLOTS.map(()=>({att:0,cmp:0,pyds:0,int:0,sk:0,car:0,ryds:0,tgt:0,rec:0,yds:0,press:0,sacks:0})); }
+const U = new Float64Array(18);
+// Which blocker (index into o.olArr: LT,LG,C,RG,RT) faces each rusher (LE, DT, NT, RE)
+const BLOCKER = {0:[4,4], 1:[3,2], 2:[1,2], 3:[0,0]};
+// os: optional offense stats (OSLOTS order: QB,RB,W1,TE,W3,W2,LT,LG,C,RG,RT)
+function simPlay(L, o, rng, st, T, down, toGo, os){
+  for(let i=0;i<18;i++) U[i]=rng();
   const lp=L.lp;
   let passP = o.pass + (down>=3&&toGo>=7?0.3:0) - (toGo<=2?0.25:0);
   if(U[0] < passP){
     T.passAtt++;
     const pPress = clamp(0.24 + (L.rush - o.ol)*0.016, 0.07, 0.55);
     let pressured=false;
+    if(os) os[0].att++;
     if(U[1] < pPress){
-      // pick rusher weighted by pass-rush rating
-      let tot=0; const w=[]; for(const i of RUSHERS){ const x=Math.max(2,lp[i].pr-40)**1.6; w.push(x); tot+=x; }
+      // pick rusher weighted by pass-rush rating and how weak their blocker is
+      let tot=0; const w=[];
+      for(const i of RUSHERS){ const bl=o.olArr?o.olArr[BLOCKER[i][0]]:o.ol; const x=Math.max(2,lp[i].pr-40)**1.6*(1+(o.ol-bl)*0.04); w.push(Math.max(0.5,x)); tot+=Math.max(0.5,x); }
       let r=U[2]*tot, k=0; while(k<3 && r>w[k]){ r-=w[k]; k++; }
       const ri=RUSHERS[k]; st[ri].press++;
+      const bi = BLOCKER[ri][U[16]<0.5?0:1];
+      if(os) os[6+bi].press++;
       const sackP = clamp(0.33 - (o.qb-80)*0.008 + (lp[ri].pr-75)*0.006, 0.12, 0.5);
-      if(U[3] < sackP){ st[ri].sacks++; T.sacks++; const y=-(5+Math.floor(U[4]*5)); T.passYds+=y; return {y}; }
+      if(U[3] < sackP){ st[ri].sacks++; T.sacks++; const y=-(5+Math.floor(U[4]*5)); T.passYds+=y; if(os){ os[0].sk++; os[6+bi].sacks++; } return {y}; }
       pressured=true;
     }
     // target
-    const t=U[5]; let rec, di, deepP;
-    if(t<.28){rec=o.wr1;di=SIDX.C1;deepP=.24}
-    else if(t<.48){rec=o.wr2;di=SIDX.C2;deepP=.22}
-    else if(t<.66){rec=o.slot;di=SIDX.NB;deepP=.12}
-    else if(t<.84){rec=o.te;di=U[6]<.5?SIDX.S2:SIDX.L1;deepP=.12}
-    else {rec=o.rb;di=U[6]<.55?SIDX.L2:SIDX.L1;deepP=.02}
+    const t=U[5]; let rec, di, deepP, ti;
+    if(t<.28){rec=o.wr1;di=SIDX.C1;deepP=.24;ti=2}
+    else if(t<.48){rec=o.wr2;di=SIDX.C2;deepP=.22;ti=5}
+    else if(t<.66){rec=o.slot;di=SIDX.NB;deepP=.12;ti=4}
+    else if(t<.84){rec=o.te;di=U[6]<.5?SIDX.S2:SIDX.L1;deepP=.12;ti=3}
+    else {rec=o.rb;di=U[6]<.55?SIDX.L2:SIDX.L1;deepP=.02;ti=1}
+    if(os) os[ti].tgt++;
     const d=lp[di]; const deep=U[7]<deepP;
     const cov = deep ? d.cov*0.6 + L.sCov*0.4 : d.cov;
     const air = deep ? 17+Math.floor(U[8]*24) : 1+Math.floor(U[8]*10);
@@ -578,10 +696,12 @@ function simPlay(L, o, rng, st, T, down, toGo){
         if(U[14] < clamp(0.1-(lp[si].tk-70)*0.005,0.03,0.25)){ st[si].miss++; yac+=10+Math.floor(U[15]*30); }
       }
       st[tk].tkl++;
-      const y=air+yac; st[di].yds+=y; T.passYds+=y; return {y};
+      const y=air+yac; st[di].yds+=y; T.passYds+=y;
+      if(os){ os[ti].rec++; os[ti].yds+=y; os[0].cmp++; os[0].pyds+=y; }
+      return {y};
     }
     const intP = clamp(0.032 - diff*0.0009 + (pressured?0.025:0) + (deep?0.02:0), 0.006, 0.1);
-    if(U[10] < intP){ const ci = deep && U[11]<.4 ? (U[12]<.5?SIDX.S1:SIDX.S2) : di; st[ci].ints++; T.takeaways++; return {y:0,to:true}; }
+    if(U[10] < intP){ const ci = deep && U[11]<.4 ? (U[12]<.5?SIDX.S1:SIDX.S2) : di; st[ci].ints++; T.takeaways++; if(os) os[0].int++; return {y:0,to:true}; }
     if(U[11] < clamp(0.3 + (d.cov-70)*0.012,0.08,0.6)) st[di].pbu++;
     return {y:0};
   }
@@ -593,7 +713,8 @@ function simPlay(L, o, rng, st, T, down, toGo){
   const z = Math.sqrt(-2*Math.log(1-U[2]*0.9999))*Math.cos(2*Math.PI*U[3]);
   let y = Math.round(3.4 + diff*0.07 + z*3.0);
   st[gi].runs++;
-  if(y<=0){ st[gi].stuff++; st[gi].tkl++; st[gi].runYds+=y; T.runYds+=y; return {y, to:U[10]<0.006}; }
+  if(os) os[1].car++;
+  if(y<=0){ st[gi].stuff++; st[gi].tkl++; st[gi].runYds+=y; T.runYds+=y; if(os) os[1].ryds+=y; return {y, to:U[10]<0.006}; }
   const bp = clamp(0.03 + diff*0.0015 + (70-L.sTk)*0.002, 0.012, 0.12);
   let tk;
   if(U[4] < bp){ y += 10+Math.floor(U[5]*30); tk = U[7]<.5?SIDX.S1:SIDX.S2; }
@@ -601,11 +722,11 @@ function simPlay(L, o, rng, st, T, down, toGo){
   const missP = clamp(0.1 - (lp[tk].tk-70)*0.005, 0.03, 0.25);
   if(U[8] < missP){ st[tk].miss++; y += 4+Math.floor(U[9]*9); }
   else st[tk].tkl++;
-  st[gi].runYds+=y; T.runYds+=y;
+  st[gi].runYds+=y; T.runYds+=y; if(os) os[1].ryds+=y;
   if(U[10] < 0.007){ T.takeaways++; return {y, to:true}; }
   return {y};
 }
-function simDrive(L, o, rng, st, T){
+function simDrive(L, o, rng, st, T, os){
   let ball = 20 + Math.floor(rng()*15), down=1, toGo=10;
   for(let p=0;p<22;p++){
     const fgU = rng();
@@ -615,7 +736,7 @@ function simDrive(L, o, rng, st, T){
       else if(dist<=55){ return fgU < clamp(1.0-(dist-28)*0.018,0.35,0.99) ? 3 : 0; }
       else return 0;
     }
-    const r = simPlay(L,o,rng,st,T,down,toGo);
+    const r = simPlay(L,o,rng,st,T,down,toGo,os);
     T.plays++; T.yds+=r.y;
     if(r.to) return 0;
     ball += r.y; if(ball<1) ball=1;
@@ -625,10 +746,13 @@ function simDrive(L, o, rng, st, T){
   }
   return 0;
 }
-function simGames(lp, opps, nGames, seed, st){
-  const L=prepare(lp); const per={}; const tot=newTeam();
+// ctx (optional): {myO, oppD:{abbr: prepared defense}, os} plays your offense against real defenses.
+function simGames(lp, opps, nGames, seed, st, ctx){
+  const L=prepare(lp); const per={}, perOff={}; const tot=newTeam(), totOff=newTeam();
+  const scratch=newStats();
   for(let oi=0;oi<opps.length;oi++){
-    const o=opps[oi]; const T=newTeam(); per[o.id]=T;
+    const o=opps[oi]; const T=newTeam(), TO=newTeam(); per[o.id]=T; perOff[o.id]=TO;
+    const oppL = ctx?.myO ? ctx.oppD?.[o.id] : null;
     for(let g=0; g<nGames; g++){
       const grng = mulberry(hash(seed, oi*10007+g, 1));
       const nPos = 10 + Math.floor(grng()*3);
@@ -636,15 +760,16 @@ function simGames(lp, opps, nGames, seed, st){
       for(let d=0; d<nPos; d++){
         opts += simDrive(L,o,mulberry(hash(seed, oi*10007+g, 100+d)),st,T);
         const br = mulberry(hash(seed, oi*10007+g, 500+d));
+        if(oppL){ bpts += simDrive(oppL, ctx.myO, br, scratch, TO, ctx.os); continue; }
         const tdP = clamp(0.235 + (MY_OFF-o.def)*0.009, 0.1, 0.5), fgP=0.17;
         const x=br(); bpts += x<tdP?7:(x<tdP+fgP?3:0);
       }
       T.games++; T.opts+=opts; T.bpts+=bpts;
       T.wins += bpts>opts?1:(bpts===opts?0.5:0);
     }
-    for(const k in tot) tot[k]+=T[k];
+    for(const k in tot){ tot[k]+=T[k]; totOff[k]+=TO[k]; }
   }
-  return {per, tot};
+  return {per, tot, perOff, totOff};
 }
 
 /* ---------- UI helpers ---------- */
@@ -652,64 +777,87 @@ const $=id=>document.getElementById(id);
 const fmt1=x=>(Math.round(x*10)/10).toFixed(1);
 const signed=x=>(x>0?"+":x<0?"−":"±")+Math.abs(x).toFixed(1);
 function ovr(p, slot){
+  if(slot.side==="O") return effO(p, slot);
   const e=eff(p,slot);
   const w={DE:[.55,.3,0,.15],DT:[.4,.45,0,.15],LB:[.1,.35,.35,.2],CB:[0,.1,.75,.15],S:[0,.25,.5,.25]}[slot.group];
   return Math.round(e.pr*w[0]+e.rs*w[1]+e.cov*w[2]+e.tk*w[3]);
 }
-function lineupArray(lu){ return SLOTS.map(s=>eff(pool[lu[s.id]],s)); }
+function lineupArray(lu){ return SLOTS.map(s=>pool[lu[s.id]]?eff(pool[lu[s.id]],s):{...AVG[s.group]}); }
+
+// Both sides share the same UI; SIDE describes each one.
+const SIDE = {
+  D:{slots:SLOTS, rows:[["dl","r4"],["lb","r2"],["cb","r3"],["s","r2"]], band:"▲ Opposing offense",
+     title:"Defensive lineup", sub:"Nickel 4-2-5. Pick a player for each spot. The colored underline shows the last simulation's verdict."},
+  O:{slots:OSLOTS, rows:[["ol","r5"],["wr","r4"],["bf","r2"]], band:"▼ Opposing defense",
+     title:"Offensive lineup", sub:"11 personnel: QB, RB, three receivers, a tight end and five linemen. Pick a player for each spot."},
+};
+const curSlots=()=>SIDE[mode].slots;
+const getLU=side=>side==="O"?olineup:lineup;
 
 function renderField(){
-  const used=new Set(Object.values(lineup));
-  const rows={dl:$("row-dl"),lb:$("row-lb"),cb:$("row-cb"),s:$("row-s")};
-  for(const r of Object.values(rows)) r.innerHTML="";
-  for(const s of SLOTS){
-    const p=pool[lineup[s.id]];
+  const slots=curSlots(), lu=getLU(mode);
+  $("lineup-title").textContent=SIDE[mode].title; $("lineup-sub").textContent=SIDE[mode].sub;
+  $("offband").textContent=SIDE[mode].band;
+  document.querySelectorAll("#mode-tabs button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.mode===mode));
+  $("rows").innerHTML=SIDE[mode].rows.map(([id,cls])=>`<div class="row ${cls}" id="row-${id}"></div>`).join("");
+  const used=new Set(Object.values(lu));
+  for(const s of slots){
+    const p=pool[lu[s.id]];
     const div=document.createElement("div"); div.className="slot"; div.id="slot-"+s.id;
-    const opts=Object.values(pool).filter(x=>s.accepts.includes(x.pos) && (x.id===p.id || available(x)))
+    if(lastVerdicts[s.id]==="bad") div.classList.add("flag-bad"); else if(lastVerdicts[s.id]==="good") div.classList.add("flag-good");
+    const opts=Object.values(pool).filter(x=>x.side===mode && s.accepts.includes(x.pos) && (x.id===p?.id || available(x)))
       .sort((a,b)=>(a.src==="fa")-(b.src==="fa")||(a.status==="ps")-(b.status==="ps")||ovr(b,s)-ovr(a,s));
-    div.innerHTML=`<div class="pos"><span>${s.label}</span><span class="ovr">${ovr(p,s)}</span></div>`;
+    div.innerHTML=`<div class="pos"><span>${s.label}</span><span class="ovr">${p?ovr(p,s):"–"}</span></div>`;
     const sel=document.createElement("select"); sel.id="sel-"+s.id; sel.setAttribute("aria-label",s.label+" player");
+    if(!p){ const o=document.createElement("option"); o.textContent="Pick a player"; o.value=""; sel.appendChild(o); }
     for(const x of opts){
       const o=document.createElement("option"); o.value=x.id;
       const tag = x.src==="fa"?" (FA)":x.src==="custom"?" (custom)":x.status==="ps"?" (PS)":!available(x)?" (out)":"";
-      o.textContent=`${x.name}${tag} · ${ovr(x,s)}${x.pos!==s.group?" ("+x.pos+")":""}${used.has(x.id)&&x.id!==p.id?" ✱":""}`;
-      if(x.id===p.id) o.selected=true; sel.appendChild(o);
+      o.textContent=`${x.name}${tag} · ${ovr(x,s)}${x.pos!==s.group?" ("+x.pos+")":""}${used.has(x.id)&&x.id!==p?.id?" ✱":""}`;
+      if(x.id===p?.id) o.selected=true; sel.appendChild(o);
     }
-    sel.addEventListener("change",()=>assign(s.id, sel.value));
-    div.appendChild(sel); rows[s.row].appendChild(div);
+    sel.addEventListener("change",()=>{ if(sel.value) assign(s.id, sel.value); });
+    div.appendChild(sel); $("row-"+s.row).appendChild(div);
   }
 }
-function assign(slotId, pid){
-  // if player already starts elsewhere, swap them
-  const other=SLOTS.find(s=>s.id!==slotId && lineup[s.id]===pid);
-  if(other) lineup[other.id]=lineup[slotId];
-  lineup[slotId]=pid; lineupCustom=true; save(); renderField(); markStale();
+function assign(slotId, pid, side=mode){
+  const lu=getLU(side), slots=SIDE[side].slots;
+  const other=slots.find(s=>s.id!==slotId && lu[s.id]===pid);   // already starting elsewhere: swap
+  if(other) lu[other.id]=lu[slotId];
+  lu[slotId]=pid;
+  if(side==="O") olineupCustom=true; else lineupCustom=true;
+  save(); renderField(); markStale();
 }
 function markStale(){ $("stale").hidden=false; clearTimeout(markStale.t); markStale.t=setTimeout(run, 500); }
 
 // Replace anyone injured, cut or missing with the best available player for that spot.
 function fixLineup(){
   notices=[];
-  for(const s of SLOTS){
-    const cur=pool[lineup[s.id]];
-    if(available(cur)) continue;
-    const taken=new Set(Object.values(lineup));
-    const best=Object.values(pool).filter(x=>x.src==="roster"&&x.status==="active"&&s.accepts.includes(x.pos)&&!taken.has(x.id)).sort((a,b)=>ovr(b,s)-ovr(a,s))[0];
-    if(best){ if(cur) notices.push(`${cur.name} is ${cur.status==="gone"?"no longer on the roster":"out"}, so ${best.name} starts at ${s.label}.`); lineup[s.id]=best.id; }
+  for(const side of ["D","O"]){
+    const lu=getLU(side);
+    for(const s of SIDE[side].slots){
+      const cur=pool[lu[s.id]];
+      if(available(cur) && cur.side===side) continue;
+      const taken=new Set(Object.values(lu));
+      const best=Object.values(pool).filter(x=>x.side===side&&x.src==="roster"&&x.status==="active"&&s.accepts.includes(x.pos)&&!taken.has(x.id)).sort((a,b)=>ovr(b,s)-ovr(a,s))[0];
+      if(best){ if(cur) notices.push(`${cur.name} is ${cur.status==="gone"?"no longer on the roster":"out"}, so ${best.name} starts at ${s.label}.`); lu[s.id]=best.id; }
+    }
   }
 }
-function defaultLineup(){
-  const l = team==="CIN" ? {...DEFAULT_LINEUP} : {};
-  if(snap?.lineup) for(const s of SLOTS){ const id=snap.lineup[s.id]; if(pool[id]) l[s.id]=id; }
+function defaultLineup(side="D"){
+  const l = team==="CIN" ? {...(side==="O"?DEFAULT_OLINEUP:DEFAULT_LINEUP)} : {};
+  const src = side==="O" ? snap?.olineup : snap?.lineup;
+  if(src) for(const s of SIDE[side].slots){ const id=src[s.id]; if(pool[id]) l[s.id]=id; }
   return l;
 }
 function applySnapshot(){
   composeSnap();
   rate = league ? makeRater(league.defenders) : null;
+  rateOff = league?.offense ? makeOffRater(league.offense) : null;
   buildPool(); buildOpps(); applyTeamColors();
-  if(!lineupCustom) lineup=defaultLineup();
-  const dl=defaultLineup();
-  for(const s of SLOTS) if(!pool[lineup[s.id]] && dl[s.id]) lineup[s.id]=dl[s.id];
+  if(!lineupCustom) lineup=defaultLineup("D");
+  if(!olineupCustom) olineup=defaultLineup("O");
+  for(const side of ["D","O"]){ const lu=getLU(side), dl=defaultLineup(side); for(const s of SIDE[side].slots) if(!pool[lu[s.id]] && dl[s.id]) lu[s.id]=dl[s.id]; }
   fixLineup();
   if(selectedOpps) for(const id of [...selectedOpps]) if(id===team) selectedOpps.delete(id);
   if(!selectedOpps || !selectedOpps.size) selectedOpps = new Set(upcoming().length ? upcoming().map(g=>g.opp) : Object.keys(PRIORS).filter(a=>a!==team));
@@ -724,13 +872,14 @@ function renderData(msg){
   else if(snapKind==="weekly") sub.textContent=`Weekly snapshot from ESPN, updated ${fmtDate(snap.fetchedAt)}.`;
   else sub.textContent="No season stats loaded. Ratings are estimates only.";
   const finals=(snap?.schedule||[]).filter(g=>g.final), w=finals.filter(g=>g.us>g.them).length, t=finals.filter(g=>g.us===g.them).length;
-  const next=upcoming()[0];
+  const next=upcoming()[0], last=finals[finals.length-1];
   $("record").innerHTML = snap ? `<div class="tile"><div class="label">${snap.season} record</div><div class="v">${w}–${finals.length-w-t}${t?"–"+t:""}</div></div>`+
     (next?`<div class="tile"><div class="label">Next · week ${next.week}</div><div class="v">${next.home?"vs":"at"} ${TEAMS[next.opp]}</div><div class="note" style="margin:0">${fmtDate(next.date)}</div></div>`:"")+
-    `<div class="tile"><div class="label">Last result</div><div class="v">${finals.length?(()=>{const g=finals[finals.length-1];return `${g.us>g.them?"W":g.us<g.them?"L":"T"} ${g.us}–${g.them}`;})():"—"}</div>${finals.length?`<div class="note" style="margin:0">${finals[finals.length-1].home?"vs":"at"} ${TEAMS[finals[finals.length-1].opp]||finals[finals.length-1].opp}</div>`:""}</div>` : "";
+    `<div class="tile"><div class="label">Last result</div><div class="v">${last?`${last.us>last.them?"W":last.us<last.them?"L":"T"} ${last.us}–${last.them}`:"—"}</div>${last?`<div class="note" style="margin:0">${last.home?"vs":"at"} ${TEAMS[last.opp]||last.opp}</div>`:""}</div>` : "";
   $("notices").innerHTML = notices.map(n=>`<div class="pill warn" style="white-space:normal;text-transform:none;letter-spacing:0;font-family:var(--body);font-weight:600">${esc(n)}</div>`).join("");
-  const off=snap?.offense;
-  if(off && off.qb) $("off-names").textContent=`QB ${off.qb} · WR ${[off.wr1,off.wr2,off.wr3].filter(Boolean).join(", ")} · RB ${off.rb} · TE ${off.te} · OL ${[off.lt,off.lg,off.c,off.rg,off.rt].filter(Boolean).join(", ")}`;
+  const nm=id=>pool[id]?.name||"—", ol=olineup;
+  $("off-names").textContent=`QB ${nm(ol.QB)} · WR ${[ol.W1,ol.W2,ol.W3].map(nm).join(", ")} · RB ${nm(ol.RB)} · TE ${nm(ol.TE)}`;
+  $("def-names").textContent=`Edge ${[lineup.E1,lineup.E2].map(nm).join(", ")} · DT ${[lineup.D1,lineup.D2].map(nm).join(", ")} · CB ${[lineup.C1,lineup.C2].map(nm).join(", ")}`;
   $("use-live").checked=useLive; $("use-live").disabled=!snap;
 }
 
@@ -750,6 +899,12 @@ function renderOpps(){
   $("opp-next").hidden=$("opp-sched").hidden=!upcoming().length;
 }
 function seasonLine(p){
+  if(p.side==="O"){
+    const s=snap?.offStats?.[p.id]; if(!s||!s.gp) return "";
+    if(p.pos==="QB") return `${s.gp} G · ${s.cmp}/${s.att} · ${s.pyds} yds · ${s.ptd} TD · ${s.int} INT`;
+    if(p.pos==="RB") return `${s.gp} G · ${s.car} car · ${s.ryds} yds · ${s.rec} rec · ${s.reyds} yds`;
+    return `${s.gp} G · ${s.rec}/${s.tgt} · ${s.reyds} yds · ${s.retd} TD`;
+  }
   const s=snap?.defStats?.[p.id]; if(!s||!s.gp) return "";
   const parts=[`${s.gp} G`,`${s.tkl} tkl`];
   if(s.sacks) parts.push(`${s.sacks} sk`); if(s.tfl) parts.push(`${s.tfl} TFL`);
@@ -761,89 +916,112 @@ function adjText(p){
   const t=[["rush",a.pr],["run",a.rs],["cov",a.cov]].filter(([,v])=>v).map(([k,v])=>`${v>0?"+":"−"}${Math.abs(v)} ${k}`);
   return t.length?t.join(", "):"";
 }
+const KEYS={D:["pr","rs","cov","tk"],O:["rt"]};
 function renderPool(){
   const tb=$("pool-body"); tb.innerHTML="";
-  const order={DE:0,DT:1,LB:2,CB:3,S:4};
-  const list=Object.values(pool).filter(p=>p.status!=="gone"||Object.values(lineup).includes(p.id))
+  const order={DE:0,DT:1,LB:2,CB:3,S:4,QB:0,RB:1,WR:2,TE:3,OL:4};
+  $("pool-head").innerHTML = mode==="D"
+    ? `<tr><th>Player · season</th><th>Pos</th><th class="n" title="Pass rush">Rush</th><th class="n" title="Run defense">Run</th><th class="n" title="Coverage">Cov</th><th class="n" title="Tackling">Tkl</th><th></th></tr>`
+    : `<tr><th>Player · season</th><th>Pos</th><th class="n">Rating</th><th></th></tr>`;
+  const starters=new Set(Object.values(getLU(mode)));
+  const list=Object.values(pool).filter(p=>p.side===mode && (p.status!=="gone"||starters.has(p.id)))
     .sort((a,b)=>order[a.pos]-order[b.pos]||(a.src==="fa")-(b.src==="fa")||(a.status!=="active")-(b.status!=="active")||a.name.localeCompare(b.name));
   for(const p of list){
     const tr=document.createElement("tr");
     const tag=p.src==="fa"?'<span class="tag">FA option</span>':p.src==="custom"?'<span class="tag">Custom</span>':
       p.status==="out"?`<span class="tag" style="color:var(--bad)">${esc(p.injury||"Out")}</span>`:p.status==="ps"?'<span class="tag">Practice squad</span>':
       p.status==="gone"?'<span class="tag">Not on roster</span>':"";
-    const unr=p.edited?'<span class="tag">Edited</span>':p.statRated?`<span class="tag" title="Rated from public stats (${esc(p.basis||"")})">${p.basis==="no stats"?"No stats yet":"From stats"}</span>`:"";
+    const unr=p.edited?'<span class="tag">Edited</span>':p.statRated?`<span class="tag" title="Rated from public stats (${esc(p.basis||"")})">${p.basis==="no stats"?"No stats yet":p.pos==="OL"?"From team stats":"From stats"}</span>`:"";
     const sl=seasonLine(p), at=adjText(p);
     tr.innerHTML=`<td class="who">${esc(p.name)}${tag}${unr}${sl?`<small>${sl}${at?` · <span style="color:var(--orange)">live ${at}</span>`:""}</small>`:""}</td><td>${p.pos}</td>`+
-      ["pr","rs","cov","tk"].map(k=>`<td class="n"><input class="rt" type="number" min="30" max="99" id="rt-${p.id}-${k}" value="${p[k]}" aria-label="${esc(p.name)} ${k}"></td>`).join("")+
+      KEYS[mode].map(k=>`<td class="n"><input class="rt" type="number" min="30" max="99" id="rt-${p.id}-${k}" value="${p[k]}" aria-label="${esc(p.name)} ${k}"></td>`).join("")+
       `<td>${p.src==="custom"?`<button class="linkbtn" data-del="${p.id}" type="button">Remove</button>`:""}</td>`;
     tb.appendChild(tr);
-    ["pr","rs","cov","tk"].forEach(k=>{ const inp=tr.querySelector(`#rt-${CSS.escape(p.id)}-${k}`);
+    KEYS[mode].forEach(k=>{ const inp=tr.querySelector(`#rt-${CSS.escape(p.id)}-${k}`);
       inp.addEventListener("change",()=>{ const v=clamp(parseInt(inp.value)||p[k],30,99); p[k]=v; inp.value=v;
         if(p.src==="custom") custom[p.id]={...custom[p.id],[k]:v}; else edits[p.id]={...(edits[p.id]||{}),[k]:v};
         save(); renderField(); markStale(); }); });
   }
   tb.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click",()=>{
-    const id=b.dataset.del; if(Object.values(lineup).includes(id)){ b.textContent="Starting, bench first"; return; }
+    const id=b.dataset.del; if(starters.has(id)){ b.textContent="Starting, bench first"; return; }
     delete custom[id]; delete pool[id]; save(); renderPool(); renderField();
   }));
+  // add form fits the side
+  $("add-pos").innerHTML=(mode==="D"?["DE","DT","LB","CB","S"]:["QB","RB","WR","TE","OL"]).map(x=>`<option>${x}</option>`).join("");
+  for(const id of ["lab-pr","lab-rs","lab-cov","lab-tk"]) $(id).hidden = mode!=="D";
+  $("lab-rt").hidden = mode!=="O";
 }
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 
 /* ---------- run ---------- */
 let running=false, queued=false;
+async function loadOppFiles(ids){
+  await Promise.all(ids.filter(id=>!oppFiles[id]).map(async id=>{ const f=await loadJSON(`data/teams/${id}.json`); if(f) oppFiles[id]=f; }));
+}
 async function run(){
   if(running){ queued=true; return; }
   running=true; $("run").disabled=true; $("run").textContent="Simulating…";
   const n=parseInt($("games").value), wk=id=>Math.min(99,...weeksVs(id)), opps=OPPS.filter(o=>selectedOpps.has(o.id)).sort((a,b)=>wk(a.id)-wk(b.id)||a.name.localeCompare(b.name));
-  const seed=20261102;
-  const lu={...lineup}; const lp=lineupArray(lu);
-  const st=newStats();
-  const base=simGames(lp, opps, n, seed, st);
+  await loadOppFiles(opps.map(o=>o.id));
+  const seed=20261102, side=mode;
+  const lu={...lineup}, olu={...olineup}; const lp=lineupArray(lu), orts=olineupRatings(olu);
+  const oppD={}; for(const o of opps){ const a=oppDefenseArray(o.id); if(a) oppD[o.id]=prepare(a); }
+  const ctx=rts=>({myO:offenseFrom(rts), oppD, os:null});
+  const st=newStats(), os=newOStats();
+  const base=simGames(lp, opps, n, seed, st, {...ctx(orts), os});
   renderSummary(base, opps, n);
-  // finder: fewer games for speed
+  // finder: fewer games for speed. Metric: points allowed (defense) or points scored (offense), higher m is better.
   const fn=Math.max(30, Math.round(n*0.6));
-  const ref = n===fn ? base : simGames(lp, opps, fn, seed, newStats());
-  const basePts = ref.tot.opts/ref.tot.games, baseWin = ref.tot.wins/ref.tot.games;
+  const metric=r=>side==="D" ? -r.tot.opts/r.tot.games : r.tot.bpts/r.tot.games;
+  const ref = n===fn ? base : simGames(lp, opps, fn, seed, newStats(), ctx(orts));
+  const baseM = metric(ref), baseWin = ref.tot.wins/ref.tot.games;
+  const slots=SIDE[side].slots, curLu=side==="D"?lu:olu, starters=new Set(Object.values(curLu));
   const jobs=[];
-  const starters=new Set(Object.values(lu));
-  SLOTS.forEach((s,i)=>{
+  slots.forEach((s,i)=>{
     jobs.push({type:"avg",slot:i});
-    for(const p of Object.values(pool)){ if(starters.has(p.id)||!s.accepts.includes(p.pos)) continue; jobs.push({type:"swap",slot:i,pid:p.id}); }
+    for(const p of Object.values(pool)){ if(p.side!==side||starters.has(p.id)||!available(p)||!s.accepts.includes(p.pos)) continue; jobs.push({type:"swap",slot:i,pid:p.id}); }
   });
-  const results=[]; let done=0; const t0=performance.now();
+  const results=[]; let done=0;
   for(const j of jobs){
-    const arr=lp.slice();
-    arr[j.slot] = j.type==="avg" ? {...AVG[SLOTS[j.slot].group]} : eff(pool[j.pid], SLOTS[j.slot]);
-    const r=simGames(arr, opps, fn, seed, newStats());
-    results.push({...j, pts:r.tot.opts/r.tot.games, win:r.tot.wins/r.tot.games});
-    done++;
-    if(performance.now()-t0 > done*0 && done%4===0){ $("prog").style.width=(done/jobs.length*100)+"%"; await new Promise(r=>setTimeout(r,0)); }
+    const s=slots[j.slot];
+    let r;
+    if(side==="D"){
+      const arr=lp.slice(); arr[j.slot] = j.type==="avg" ? {...AVG[s.group]} : eff(pool[j.pid], s);
+      r=simGames(arr, opps, fn, seed, newStats(), ctx(orts));
+    } else {
+      const arr=orts.slice(); arr[j.slot] = j.type==="avg" ? OAVG[s.id] : effO(pool[j.pid], s);
+      r=simGames(lp, opps, fn, seed, newStats(), ctx(arr));
+    }
+    results.push({...j, m:metric(r), win:r.tot.wins/r.tot.games});
+    if(++done%4===0){ $("prog").style.width=(done/jobs.length*100)+"%"; await new Promise(r=>setTimeout(r,0)); }
   }
   $("prog").style.width="100%";
-  renderReport(st, base, results, basePts, opps, n);
-  renderSwaps(results, basePts, baseWin, lu);
+  if(side===mode){
+    renderReport(side==="D"?st:os, base, results, baseM, side, side==="D"?lu:olu);
+    renderSwaps(results, baseM, baseWin, side==="D"?lu:olu, side);
+  }
   $("stale").hidden=true;
   setTimeout(()=>{$("prog").style.width="0";},400);
   running=false; $("run").disabled=false; $("run").textContent="Run simulation";
-  if(queued){ queued=false; run(); }
+  if(queued || side!==mode){ queued=false; run(); }
 }
 function renderSummary(base, opps, n){
-  const T=base.tot, g=T.games;
-  $("sum-sub").textContent=`${g.toLocaleString()} simulated games: ${n} against each of ${opps.length} offense${opps.length>1?"s":""}.`;
-  const winP=T.wins/g*100;
+  const T=base.tot, O=base.totOff, g=T.games;
+  $("sum-sub").textContent=`${g.toLocaleString()} simulated games: ${n} against each of ${opps.length} team${opps.length>1?"s":""}.`;
   const tiles=[
-    ["Win rate",`${fmt1(winP)}<small>%</small>`],
+    ["Win rate",`${fmt1(T.wins/g*100)}<small>%</small>`],
     ["Avg score",`${Math.round(T.bpts/g)}<small>–</small>${Math.round(T.opts/g)}`],
+    ["Pts scored / g",fmt1(T.bpts/g)],
     ["Pts allowed / g",fmt1(T.opts/g)],
-    ["Yards / play",fmt1(T.yds/T.plays)],
+    ["Offense yds / play",O.plays?fmt1(O.yds/O.plays):"–"],
+    ["Defense yds / play",fmt1(T.yds/T.plays)],
     ["Sacks / g",fmt1(T.sacks/g)],
     ["Takeaways / g",fmt1(T.takeaways/g)],
   ];
   $("tiles").innerHTML=tiles.map(([l,v])=>`<div class="tile"><div class="label">${l}</div><div class="v">${v}</div></div>`).join("");
-  $("opp-body").innerHTML=opps.map(o=>{ const t=base.per[o.id], gg=t.games; const w=t.wins/gg*100;
+  $("opp-body").innerHTML=opps.map(o=>{ const t=base.per[o.id], to=base.perOff[o.id], gg=t.games; const w=t.wins/gg*100;
     const cls = w<50?"bad":w<65?"warn":"good";
-    const passPlays=t.passAtt||1, runs=t.runs||1;
-    return `<tr><td class="who">${o.name}${weeksVs(o.id).length?` <span class="tag">Wk ${weeksVs(o.id).join(", ")}</span>`:""}<small>${o.style}</small></td><td class="n"><span class="pill ${cls}">${fmt1(w)}</span></td><td class="n">${Math.round(t.bpts/gg)}–${Math.round(t.opts/gg)}</td><td class="n">${fmt1(t.opts/gg)}</td><td class="n">${fmt1(t.yds/t.plays)}</td><td class="n">${fmt1(t.passYds/passPlays)}</td><td class="n">${fmt1(t.runYds/runs)}</td></tr>`;
+    return `<tr><td class="who">${o.name}${weeksVs(o.id).length?` <span class="tag">Wk ${weeksVs(o.id).join(", ")}</span>`:""}<small>${o.style}</small></td><td class="n"><span class="pill ${cls}">${fmt1(w)}</span></td><td class="n">${Math.round(t.bpts/gg)}–${Math.round(t.opts/gg)}</td><td class="n">${to.plays?fmt1(to.yds/to.plays):"–"}</td><td class="n">${fmt1(t.yds/t.plays)}</td><td class="n">${fmt1(t.passYds/(t.passAtt||1))}</td><td class="n">${fmt1(t.runYds/(t.runs||1))}</td></tr>`;
   }).join("");
 }
 function statLine(s, slot, g){
@@ -860,48 +1038,71 @@ function statLine(s, slot, g){
   const parts = slot.group==="DE"||slot.group==="DT" ? [xtra.join(" · "), run] : slot.group==="LB" ? [run, cov, xtra.join(" · ")] : [cov, xtra.join(" · ")];
   return parts.filter(Boolean).join("<br>");
 }
+function statLineO(s, slot, g){
+  const pg=x=>fmt1(x/g);
+  if(slot.group==="QB") return s.att ? `${Math.round(s.cmp/Math.max(1,s.att-s.sk)*100)}% comp · ${(s.pyds/Math.max(1,s.att-s.sk)).toFixed(1)} yds/att<br>${pg(s.pyds)} yds · ${pg(s.int)} INT · sacked ${pg(s.sk)}` : "";
+  if(slot.group==="RB") return `${pg(s.car)} car · ${s.car?(s.ryds/s.car).toFixed(1):"0.0"} yds/car<br>${pg(s.tgt)} tgt · ${pg(s.yds)} rec yds`;
+  if(slot.group==="OL") return `${pg(s.press)} pressures allowed<br>${pg(s.sacks)} sacks allowed`;
+  return s.tgt ? `${pg(s.tgt)} tgt · ${Math.round(s.rec/s.tgt*100)}% caught<br>${pg(s.yds)} yds · ${(s.yds/s.tgt).toFixed(1)} yds/tgt` : "";
+}
 let lastVerdicts={};
-function renderReport(st, base, results, basePts, opps, n){
-  const g=base.tot.games;
+function renderReport(st, base, results, baseM, side, lu){
+  const g=base.tot.games, slots=SIDE[side].slots;
+  $("rep-sub").textContent = side==="D"
+    ? "Value compares each starter to a league-average player at the same spot. Negative means that spot is giving up extra points."
+    : "Value compares each starter to a league-average player at the same spot. Negative means that spot is costing you points.";
   lastVerdicts={};
-  const rows=SLOTS.map((s,i)=>{
+  const rows=slots.map((s,i)=>{
     const a=results.find(r=>r.type==="avg"&&r.slot===i);
-    const val=a.pts-basePts; // positive: player better than average
-    const best=results.filter(r=>r.type==="swap"&&r.slot===i).sort((x,y)=>x.pts-y.pts)[0];
-    const upgrade = best ? basePts-best.pts : 0;
+    const val=baseM-a.m; // positive: player better than average
+    // Switch out: below an average starter, or someone already on the roster is clearly better.
+    // Watch: around average, or only a free-agent type would be a big upgrade.
+    const swaps=results.filter(r=>r.type==="swap"&&r.slot===i);
+    const bestOf=list=>list.length?Math.max(...list.map(r=>r.m))-baseM:0;
+    const rosterUp=bestOf(swaps.filter(r=>pool[r.pid]?.src!=="fa")), anyUp=bestOf(swaps);
     let v, cls;
-    if(val < -0.35 || upgrade > 0.8){ v="Switch out"; cls="bad"; }
-    else if(val < 0.15 || upgrade > 0.35){ v="Watch"; cls="warn"; }
+    if(val < -0.35 || rosterUp > 0.5){ v="Switch out"; cls="bad"; }
+    else if(val < 0.15 || anyUp > 1.0){ v="Watch"; cls="warn"; }
     else { v="Keep"; cls="good"; }
     lastVerdicts[s.id]=cls;
-    const p=pool[lineup[s.id]];
+    const p=pool[lu[s.id]]; if(!p) return "";
     const w=Math.min(50, Math.abs(val)/2*50);
     const bar=`<div class="bar" aria-hidden="true"><i style="${val>=0?`left:50%;width:${w}%;background:var(--good)`:`right:50%;width:${w}%;background:var(--bad)`}"></i></div>`;
-    return {val, html:`<tr><td class="label">${s.label}</td><td class="who">${esc(p.name)}<small>${p.pos} · ovr ${ovr(p,s)}${seasonLine(p)?`<br>${seasonLine(p)}`:""}</small></td><td>${bar}</td><td class="n">${signed(val)}</td><td style="font-size:12.5px;min-width:200px">${statLine(st[i],s,g)}</td><td><span class="pill ${cls}">${v}</span></td></tr>`};
+    const line = side==="D" ? statLine(st[i],s,g) : statLineO(st[i],s,g);
+    return `<tr><td class="label">${s.label}</td><td class="who">${esc(p.name)}<small>${p.pos} · ${side==="D"?"ovr ":"rating "}${ovr(p,s)}${seasonLine(p)?`<br>${seasonLine(p)}`:""}</small></td><td>${bar}</td><td class="n">${signed(val)}</td><td style="font-size:12.5px;min-width:200px">${line}</td><td><span class="pill ${cls}">${v}</span></td></tr>`;
   });
-  $("rep-body").innerHTML=rows.map(r=>r.html).join("");
-  for(const s of SLOTS){ const el=$("slot-"+s.id); if(el){ el.classList.remove("flag-bad","flag-good"); if(lastVerdicts[s.id]==="bad") el.classList.add("flag-bad"); else if(lastVerdicts[s.id]==="good") el.classList.add("flag-good"); } }
+  $("rep-body").innerHTML=rows.join("");
+  for(const s of slots){ const el=$("slot-"+s.id); if(el){ el.classList.remove("flag-bad","flag-good"); if(lastVerdicts[s.id]==="bad") el.classList.add("flag-bad"); else if(lastVerdicts[s.id]==="good") el.classList.add("flag-good"); } }
 }
-function renderSwaps(results, basePts, baseWin, lu){
-  const sw=results.filter(r=>r.type==="swap").map(r=>({...r, saved:basePts-r.pts, dw:(r.win-baseWin)*100})).filter(r=>r.saved>0.15).sort((a,b)=>b.saved-a.saved);
-  // keep best per slot first, then fill
+function renderSwaps(results, baseM, baseWin, lu, side){
+  const slots=SIDE[side].slots;
+  $("swap-sub").textContent = side==="D"
+    ? "Every bench player and free-agent option was tried in every spot they can play, against the same simulated games. Ranked by points saved per game."
+    : "Every bench player and free-agent option was tried in every spot they can play, against the same simulated games. Ranked by points gained per game.";
+  const sw=results.filter(r=>r.type==="swap").map(r=>({...r, gain:r.m-baseM, dw:(r.win-baseWin)*100})).filter(r=>r.gain>0.15).sort((a,b)=>b.gain-a.gain);
   const seen=new Set(), top=[];
   for(const r of sw){ if(!seen.has(r.slot)){ seen.add(r.slot); top.push(r); } if(top.length>=6) break; }
-  if(!top.length){ $("swaps").innerHTML='<div class="empty">No swap saves more than 0.15 points per game. This lineup is as good as the pool allows against these offenses.</div>'; return; }
+  if(!top.length){ $("swaps").innerHTML=`<div class="empty">No swap ${side==="D"?"saves":"adds"} more than 0.15 points per game. This lineup is as good as the pool allows against these teams.</div>`; return; }
   $("swaps").innerHTML=top.map(r=>{
-    const s=SLOTS[r.slot], out=pool[lu[s.id]], inn=pool[r.pid];
-    const src=inn.src==="fa"?"free-agent option":inn.src==="custom"?"custom player":"bench";
-    return `<div class="swap"><div class="line">${s.label}: ${esc(out.name)}<span class="arrow">→</span>${esc(inn.name)}</div><div class="delta">−${r.saved.toFixed(1)} pts</div>
-      <div class="meta">${src} · win rate ${r.dw>=0?"+":"−"}${Math.abs(r.dw).toFixed(1)} pts · ${inn.pos!==s.group?`playing out of position (${inn.pos}) · `:""}rush ${inn.pr} / run ${inn.rs} / cov ${inn.cov} / tkl ${inn.tk}</div>
+    const s=slots[r.slot], out=pool[lu[s.id]], inn=pool[r.pid];
+    const src=inn.src==="fa"?"free-agent option":inn.src==="custom"?"custom player":inn.status==="ps"?"practice squad":"bench";
+    const ratings = side==="D" ? `rush ${inn.pr} / run ${inn.rs} / cov ${inn.cov} / tkl ${inn.tk}` : `rating ${inn.rt}`;
+    return `<div class="swap"><div class="line">${s.label}: ${esc(out?.name||"—")}<span class="arrow">→</span>${esc(inn.name)}</div><div class="delta">${side==="D"?"−":"+"}${r.gain.toFixed(1)} pts</div>
+      <div class="meta">${src} · win rate ${r.dw>=0?"+":"−"}${Math.abs(r.dw).toFixed(1)} pts · ${inn.pos!==s.group?`playing out of position (${inn.pos}) · `:""}${ratings}</div>
       <button class="linkbtn" type="button" data-slot="${s.id}" data-pid="${inn.id}">Make this swap</button></div>`;
   }).join("");
-  $("swaps").querySelectorAll("button[data-slot]").forEach(b=>b.addEventListener("click",()=>assign(b.dataset.slot,b.dataset.pid)));
+  $("swaps").querySelectorAll("button[data-slot]").forEach(b=>b.addEventListener("click",()=>assign(b.dataset.slot,b.dataset.pid,side)));
 }
 
 /* ---------- wiring ---------- */
 $("run").addEventListener("click",run);
 $("games").addEventListener("change",markStale);
-$("reset-lineup").addEventListener("click",()=>{ lineupCustom=false; lineup=defaultLineup(); fixLineup(); save(); renderData(); renderField(); markStale(); });
+$("reset-lineup").addEventListener("click",()=>{
+  if(mode==="O"){ olineupCustom=false; olineup=defaultLineup("O"); } else { lineupCustom=false; lineup=defaultLineup("D"); }
+  fixLineup(); save(); renderData(); renderField(); markStale(); });
+document.querySelectorAll("#mode-tabs button").forEach(b=>b.addEventListener("click",()=>{
+  if(mode===b.dataset.mode) return; mode=b.dataset.mode; lastVerdicts={}; save(); renderField(); renderPool();
+  $("swaps").innerHTML='<div class="empty">Simulating…</div>'; $("rep-body").innerHTML=""; run(); }));
 const setOpps=ids=>{ if(!ids.length) return; selectedOpps=new Set(ids); save(); renderOpps(); markStale(); };
 $("opp-next").addEventListener("click",()=>setOpps(upcoming().slice(0,1).map(g=>g.opp)));
 $("opp-sched").addEventListener("click",()=>setOpps(upcoming().map(g=>g.opp)));
@@ -913,7 +1114,9 @@ $("addform").addEventListener("submit",e=>{
   e.preventDefault();
   const name=$("add-name").value.trim(); if(!name) return;
   const id="c-"+Date.now().toString(36);
-  custom[id]={id,name,pos:$("add-pos").value,pr:clamp(+$("add-pr").value||70,30,99),rs:clamp(+$("add-rs").value||70,30,99),cov:clamp(+$("add-cov").value||70,30,99),tk:clamp(+$("add-tk").value||70,30,99)};
+  custom[id] = mode==="O"
+    ? {id,name,pos:$("add-pos").value,rt:clamp(+$("add-rt").value||75,30,99)}
+    : {id,name,pos:$("add-pos").value,pr:clamp(+$("add-pr").value||70,30,99),rs:clamp(+$("add-rs").value||70,30,99),cov:clamp(+$("add-cov").value||70,30,99),tk:clamp(+$("add-tk").value||70,30,99)};
   $("add-name").value=""; save(); buildPool(); renderPool(); renderField(); markStale();
 });
 
@@ -924,13 +1127,13 @@ async function refreshLive(auto, force){
   const btn=$("live"); btn.disabled=true; btn.textContent="Fetching…";
   const forTeam=team;
   try{
-    const { fetchLeague, fetchTeam } = await import("./js/espn.js?v=3");
+    const { fetchLeague, fetchTeam } = await import("./js/espn.js?v=4");
     if(!liveLeague || force) liveLeague = await fetchLeague({ onProgress:(m,f)=>renderData(`Fetching live stats: ${m.toLowerCase()} (${Math.round(f*100)}%)`) });
     if(!liveTeams[forTeam] || force){ renderData("Fetching live roster and depth chart…"); liveTeams[forTeam] = await fetchTeam(forTeam); }
     if(forTeam===team){
-      const before=JSON.stringify([league?.teams,league?.defenders,tdata?.players,tdata?.depth,tdata?.schedule]);
+      const before=JSON.stringify([league?.teams,league?.defenders,league?.offense,tdata?.players,tdata?.depth,tdata?.odepth,tdata?.schedule]);
       league=liveLeague; tdata=liveTeams[forTeam]; snapKind="live";
-      const after=JSON.stringify([league.teams,league.defenders,tdata.players,tdata.depth,tdata.schedule]);
+      const after=JSON.stringify([league.teams,league.defenders,league.offense,tdata.players,tdata.depth,tdata.odepth,tdata.schedule]);
       if(before!==after){ applySnapshot(); run(); } else { composeSnap(); renderData(); }
     }
   }catch(e){
