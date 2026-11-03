@@ -122,6 +122,20 @@ tr:last-child td{border-bottom:0}
 .swap .delta{font-family:var(--num);font-weight:700;font-size:20px;color:var(--good);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .swap button{grid-column:1/-1;justify-self:start}
 .empty{color:var(--muted);font-size:14px;padding:8px 0}
+.po-chart{margin-top:14px}
+.hist{display:flex;align-items:flex-end;gap:2px;height:120px;border-bottom:1px solid var(--line);padding-top:18px}
+.hist .col{flex:1 1 0;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;position:relative;outline:none}
+.hist .bar{width:100%;max-width:38px;border-radius:4px 4px 0 0;min-height:2px;flex-shrink:0;position:relative}
+.hist .bar .top{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:2px;font-family:var(--num);font-size:12px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.hist .col:hover .bar,.hist .col:focus .bar{filter:brightness(1.12)}
+.hist .col[data-tip]:hover::after,.hist .col[data-tip]:focus::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);font:600 12px var(--body);padding:4px 7px;border-radius:4px;white-space:nowrap;z-index:2;pointer-events:none}
+.hist-x{display:flex;gap:2px;margin-top:4px}
+.hist-x span{flex:1 1 0;min-width:0;text-align:center;font-family:var(--num);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.po-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:12.5px;color:var(--muted)}
+.po-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.po-games{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.po-games span{border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:13px;background:var(--surface-2);white-space:nowrap}
+.po-games b{font-family:var(--num);font-variant-numeric:tabular-nums;margin-left:4px}
 .note{font-size:12.5px;color:var(--muted);margin-top:10px}
 .stale{display:inline-block;margin-left:8px}
 
@@ -234,6 +248,24 @@ details.pool[open] summary h2::after{content:" –"}
       <div class="tiles" id="record" style="margin-top:12px"></div>
       <label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-weight:600;font-size:14px"><input type="checkbox" id="use-live" checked> Adjust ratings with this season's stats</label>
       <div id="notices" style="display:flex;flex-direction:column;gap:6px;margin-top:10px"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-po" id="po-panel" hidden>
+      <h2 id="h-po">Playoff odds</h2>
+      <p class="sub" id="po-sub"></p>
+      <div class="tiles" id="po-tiles"></div>
+      <div class="po-chart">
+        <div class="label" style="margin-bottom:6px">Final win total, share of simulated seasons</div>
+        <div class="hist" id="po-hist" role="img"></div>
+        <div class="po-legend" aria-hidden="true">
+          <span><i style="background:var(--good)"></i>Likely in (80%+)</span>
+          <span><i style="background:var(--warn)"></i>On the bubble</span>
+          <span><i style="background:var(--bad)"></i>Likely out (under 30%)</span>
+        </div>
+      </div>
+      <div class="label" style="margin-top:14px">Remaining games · simulated win chance</div>
+      <div class="po-games" id="po-games"></div>
+      <p class="note" id="po-note"></p>
     </section>
 
     <section class="panel" aria-labelledby="h-sum">
@@ -970,6 +1002,16 @@ async function run(){
   const st=newStats(), os=newOStats();
   const base=simGames(lp, opps, n, seed, st, {...ctx(orts), os});
   renderSummary(base, opps, n);
+  // Playoff odds need every remaining opponent, selected or not.
+  const need=[...new Set(upcoming().map(g=>g.opp))].filter(id=>!base.per[id]);
+  let extra=null;
+  if(need.length){
+    await loadOppFiles(need);
+    const eo=OPPS.filter(o=>need.includes(o.id));
+    for(const o of eo){ const a=oppDefenseArray(o.id); if(a) oppD[o.id]=prepare(a); }
+    extra=simGames(lp, eo, Math.min(n,100), seed, newStats(), ctx(orts));
+  }
+  renderPlayoffs(id=>{ const t=base.per[id]||extra?.per[id]; return t&&t.games ? t.wins/t.games : 0.5; });
   // finder: fewer games for speed. Metric: points allowed (defense) or points scored (offense), higher m is better.
   const fn=Math.max(30, Math.round(n*0.6));
   const metric=r=>side==="D" ? -r.tot.opts/r.tot.games : r.tot.bpts/r.tot.games;
@@ -1004,6 +1046,48 @@ async function run(){
   setTimeout(()=>{$("prog").style.width="0";},400);
   running=false; $("run").disabled=false; $("run").textContent="Run simulation";
   if(queued || side!==mode){ queued=false; run(); }
+}
+// Share of teams that made the playoffs at each final win total, 17-game seasons (approximate, 2021–2025).
+const PLAYOFF_BY_WINS = {6:0.003,7:0.03,8:0.15,9:0.5,10:0.85,11:0.97,12:0.995,13:1};
+function playoffChance(w){
+  if(w<6) return 0; if(w>=13) return 1;
+  const lo=Math.floor(w), f=w-lo, a=PLAYOFF_BY_WINS[lo], b=PLAYOFF_BY_WINS[lo+1]??1;
+  return a+(b-a)*f;
+}
+function renderPlayoffs(winP){
+  const panel=$("po-panel");
+  const finals=(snap?.schedule||[]).filter(g=>g.final), rem=upcoming();
+  if(!snap || !rem.length){ panel.hidden=true; return; }
+  panel.hidden=false;
+  const w0=finals.filter(g=>g.us>g.them).length, t0=finals.filter(g=>g.us===g.them).length, l0=finals.length-w0-t0;
+  const ps=rem.map(g=>winP(g.opp));
+  const N=20000, rng=mulberry(4242), dist=new Map(); let po=0, sumW=0;
+  for(let i=0;i<N;i++){
+    let w=w0+t0*0.5; for(const p of ps) if(rng()<p) w++;
+    po+=playoffChance(w); sumW+=w; const k=Math.floor(w); dist.set(k,(dist.get(k)||0)+1);
+  }
+  const pct=po/N*100, mean=sumW/N, games=finals.length+rem.length;
+  const pCls=p=>p>=0.8?"good":p>=0.3?"warn":"bad";
+  const tileCls=pct>=80?"good":pct>=30?"warn":"bad";
+  const atLeast=k=>[...dist].filter(([w])=>w>=k).reduce((a,[,c])=>a+c,0)/N*100;
+  $("po-sub").textContent=`From the current ${w0}–${l0}${t0?"–"+t0:""} record, the remaining ${rem.length} games were played out 20,000 times using each opponent's simulated win chance with this lineup.`;
+  $("po-tiles").innerHTML=
+    `<div class="tile"><div class="label">Make playoffs</div><div class="v"><span class="pill ${tileCls}" style="font-size:26px;padding:2px 8px">${pct<1?"<1":pct>99?">99":Math.round(pct)}%</span></div></div>`+
+    `<div class="tile"><div class="label">Projected record</div><div class="v">${Math.round(mean)} – ${games-Math.round(mean)-t0}${t0?" – "+t0:""}</div></div>`+
+    `<div class="tile"><div class="label">10+ wins</div><div class="v">${fmt1(atLeast(10))}<small>%</small></div></div>`+
+    `<div class="tile"><div class="label">12+ wins</div><div class="v">${fmt1(atLeast(12))}<small>%</small></div></div>`;
+  const ks=[...dist.keys()].sort((a,b)=>a-b), lo=ks[0], hi=ks[ks.length-1];
+  const range=[]; for(let k=lo;k<=hi;k++) range.push(k);
+  const maxC=Math.max(...dist.values()), mode=ks.reduce((a,b)=>dist.get(b)>dist.get(a)?b:a);
+  $("po-hist").setAttribute("aria-label", `Most likely final total: ${mode} wins. ` + range.map(k=>`${k} wins ${fmt1((dist.get(k)||0)/N*100)}%`).join(", "));
+  $("po-hist").innerHTML=range.map(k=>{
+    const c=dist.get(k)||0, share=c/N*100, pc=playoffChance(k+t0*0.5);
+    return `<div class="col" tabindex="0" data-tip="${k} wins · ${fmt1(share)}% of seasons · ${Math.round(pc*100)}% make playoffs"><div class="bar" style="height:${Math.max(1.5,c/maxC*100*0.85)}%;background:var(--${pCls(pc)})">${k===mode?`<span class="top">${Math.round(share)}%</span>`:""}</div></div>`;
+  }).join("");
+  let x=$("po-hist-x"); if(!x){ x=document.createElement("div"); x.className="hist-x"; x.id="po-hist-x"; $("po-hist").after(x); }
+  x.innerHTML=range.map(k=>`<span>${k}</span>`).join("");
+  $("po-games").innerHTML=rem.map((g,i)=>`<span>Wk ${g.week} ${g.home?"vs":"at"} ${esc(TEAMS[g.opp]||g.opp)}<b>${Math.round(ps[i]*100)}%</b></span>`).join("");
+  $("po-note").textContent="Playoff chance for each final win total uses approximate historical rates from 17-game seasons (about half of 9-win teams get in, most 10-win teams do). It doesn't model tiebreakers, division races or other teams' results.";
 }
 function renderSummary(base, opps, n){
   const T=base.tot, O=base.totOff, g=T.games;
