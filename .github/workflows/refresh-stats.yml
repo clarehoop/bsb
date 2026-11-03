@@ -2,7 +2,7 @@ name: Refresh stats
 
 on:
   schedule:
-    # Tuesdays 12:00 UTC, after Monday Night Football
+    # Tuesdays 12:00 UTC, after Monday Night Football weekly
     - cron: "0 12 * * 2"
   workflow_dispatch: {}
 
